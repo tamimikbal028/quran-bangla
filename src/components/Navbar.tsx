@@ -7,6 +7,7 @@ import {
   Flame,
   Pause,
   Play,
+  Cloud,
 } from "lucide-react";
 import type { DailyReadingStats } from "../services/timerService";
 import { formatTimeMMSS, toBengaliNumber } from "../utils/bengali";
@@ -18,6 +19,8 @@ interface NavbarProps {
   isTimerRunning: boolean;
   onToggleTimer: () => void;
   onOpenGoalModal: () => void;
+  isSyncConnected: boolean;
+  onOpenSyncModal: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -27,6 +30,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   isTimerRunning,
   onToggleTimer,
   onOpenGoalModal,
+  isSyncConnected,
+  onOpenSyncModal,
 }) => {
   return (
     <header className="border-b border-emerald-900/10 bg-white/95 backdrop-blur-md sticky top-0 z-40 transition-shadow">
@@ -62,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Right Section: Reading Timer & Navigation */}
+        {/* Right Section: Reading Timer, Cloud Sync & Navigation */}
         <div className="flex items-center gap-2">
           {/* Daily Goal Timer Pill */}
           <div className="flex items-center bg-slate-100/90 rounded-2xl p-1 border border-slate-200/80 shadow-2xs">
@@ -109,6 +114,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
           </div>
+
+          {/* Cloud Sync Button */}
+          <button
+            onClick={onOpenSyncModal}
+            className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 ${
+              isSyncConnected
+                ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200/90"
+                : "text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-slate-200/80"
+            }`}
+            title={
+              isSyncConnected
+                ? "ক্লাউড সিঙ্ক সক্রিয় (ক্লিক করে বিস্তারিত দেখুন)"
+                : "মোবাইল ও পিসি সিঙ্ক চালু করুন"
+            }
+            aria-label="ক্লাউড সিঙ্ক"
+          >
+            <Cloud className="w-4 h-4" />
+            {isSyncConnected && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+            )}
+          </button>
 
           {/* Surah List Button if inside reader */}
           {currentSurahId !== null && (

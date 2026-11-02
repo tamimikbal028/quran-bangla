@@ -7,6 +7,8 @@ import { Navbar } from "./components/Navbar";
 import { SurahList } from "./components/SurahList";
 import { SurahReader } from "./components/SurahReader";
 import { DailyGoalModal } from "./components/DailyGoalModal";
+import { SyncModal } from "./components/SyncModal";
+import { SyncService } from "./services/syncService";
 import { CheckCircle2 } from "lucide-react";
 
 function App() {
@@ -23,6 +25,12 @@ function App() {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState<boolean>(false);
   const [goalCelebrationToast, setGoalCelebrationToast] =
     useState<boolean>(false);
+
+  // Sync State
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState<boolean>(false);
+  const [isSyncConnected, setIsSyncConnected] = useState<boolean>(
+    () => !!SyncService.getCredentials(),
+  );
 
   const unsavedSecondsRef = useRef<number>(0);
 
@@ -65,12 +73,41 @@ function App() {
     }
   };
 
-  // Initialize
+  // Initialize & Background Cloud Sync
   useEffect(() => {
     const list = QuranService.getAllSurahs();
     setSurahs(list);
     setLastRead(QuranService.getLastRead());
     setTimerStats(TimerService.getStats());
+
+    // Auto-sync if connected
+    if (SyncService.getCredentials()) {
+      setIsSyncConnected(true);
+      SyncService.pullData().then((res) => {
+        if (res.ok && res.hasChanges) {
+          if (res.mergedLastRead !== undefined) setLastRead(res.mergedLastRead);
+          if (res.mergedStats) setTimerStats(res.mergedStats);
+        }
+      });
+    }
+
+    // Pull when returning to tab
+    const handleVisibilityChange = () => {
+      if (!document.hidden && SyncService.getCredentials()) {
+        SyncService.pullData().then((res) => {
+          if (res.ok && res.hasChanges) {
+            if (res.mergedLastRead !== undefined)
+              setLastRead(res.mergedLastRead);
+            if (res.mergedStats) setTimerStats(res.mergedStats);
+          }
+        });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   // Timer Tick while reading a Surah
@@ -128,6 +165,9 @@ function App() {
     setTargetAyah(undefined);
     setLastRead(QuranService.getLastRead());
     setTimerStats(TimerService.getStats());
+    if (isSyncConnected) {
+      SyncService.pushData();
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -153,7 +193,7 @@ function App() {
         </div>
       )}
 
-      {/* Navbar with Daily Goal Widget */}
+      {/* Navbar with Daily Goal Widget & Cloud Sync */}
       <Navbar
         currentSurahId={selectedSurahId}
         onBackToList={handleBackToList}
@@ -161,6 +201,8 @@ function App() {
         isTimerRunning={isTimerRunning}
         onToggleTimer={() => setIsTimerRunning((r) => !r)}
         onOpenGoalModal={() => setIsGoalModalOpen(true)}
+        isSyncConnected={isSyncConnected}
+        onOpenSyncModal={() => setIsSyncModalOpen(true)}
       />
 
       {/* PWA Offline Install Banner */}
@@ -202,7 +244,12 @@ function App() {
             targetAyah={targetAyah}
             onSelectSurah={(id) => handleSelectSurah(id)}
             onBackToList={handleBackToList}
-            onLastReadUpdated={(lr) => setLastRead(lr)}
+            onLastReadUpdated={(lr) => {
+              setLastRead(lr);
+              if (isSyncConnected) {
+                SyncService.pushData();
+              }
+            }}
           />
         ) : (
           <SurahList
@@ -220,7 +267,26 @@ function App() {
         isOpen={isGoalModalOpen}
         onClose={() => setIsGoalModalOpen(false)}
         stats={timerStats}
-        onStatsUpdated={(newStats) => setTimerStats(newStats)}
+        onStatsUpdated={(newStats) => {
+          setTimerStats(newStats);
+          if (isSyncConnected) {
+            SyncService.pushData();
+          }
+        }}
+      />
+
+      {/* Cloud Sync Modal */}
+      <SyncModal
+        isOpen={isSyncModalOpen}
+        onClose={() => {
+          setIsSyncModalOpen(false);
+          setIsSyncConnected(!!SyncService.getCredentials());
+        }}
+        onDataSynced={({ lastRead: lr, timerStats: ts }) => {
+          if (lr !== undefined) setLastRead(lr);
+          if (ts) setTimerStats(ts);
+          setIsSyncConnected(!!SyncService.getCredentials());
+        }}
       />
 
       {/* Footer */}
