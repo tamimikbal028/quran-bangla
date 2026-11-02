@@ -7,7 +7,7 @@ import {
   Flame,
   Pause,
   Play,
-  Cloud,
+  User,
 } from "lucide-react";
 import type { DailyReadingStats } from "../services/timerService";
 import { formatTimeMMSS, toBengaliNumber } from "../utils/bengali";
@@ -20,6 +20,7 @@ interface NavbarProps {
   onToggleTimer: () => void;
   onOpenGoalModal: () => void;
   isSyncConnected: boolean;
+  loggedInUsername?: string | null;
   onOpenSyncModal: () => void;
 }
 
@@ -31,6 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTimer,
   onOpenGoalModal,
   isSyncConnected,
+  loggedInUsername,
   onOpenSyncModal,
 }) => {
   return (
@@ -115,24 +117,34 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {/* Cloud Sync Button */}
+          {/* User Account / Sync Button */}
           <button
             onClick={onOpenSyncModal}
-            className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`py-1.5 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs ${
               isSyncConnected
-                ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200/90"
-                : "text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-slate-200/80"
+                ? "text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-emerald-200/90"
+                : "text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border-slate-200/90"
             }`}
             title={
               isSyncConnected
-                ? "ক্লাউড সিঙ্ক সক্রিয় (ক্লিক করে বিস্তারিত দেখুন)"
-                : "মোবাইল ও পিসি সিঙ্ক চালু করুন"
+                ? `লগইন আছেন: ${loggedInUsername || "ব্যবহারকারী"} (অটো-সিঙ্ক সক্রিয়)`
+                : "অ্যাকাউন্টে লগইন বা সাইন আপ করুন"
             }
-            aria-label="ক্লাউড সিঙ্ক"
+            aria-label="অ্যাকাউন্ট"
           >
-            <Cloud className="w-4 h-4" />
-            {isSyncConnected && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+            {isSyncConnected ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                <User className="w-3.5 h-3.5 text-emerald-700" />
+                <span className="max-w-[80px] truncate hidden xs:inline">
+                  {loggedInUsername || "অ্যাকাউন্ট"}
+                </span>
+              </>
+            ) : (
+              <>
+                <User className="w-3.5 h-3.5 text-slate-500" />
+                <span>লগইন</span>
+              </>
             )}
           </button>
 

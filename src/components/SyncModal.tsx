@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from "react";
 import {
   X,
-  Cloud,
+  User,
+  Lock,
+  LogIn,
+  UserPlus,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
-  Lock,
-  Smartphone,
   LogOut,
-  ShieldCheck,
-  User,
+  Sparkles,
 } from "lucide-react";
 import { SyncService, type SyncCredentials } from "../services/syncService";
 import type { DailyReadingStats } from "../services/timerService";
@@ -30,8 +30,9 @@ export const SyncModal: React.FC<SyncModalProps> = ({
   onDataSynced,
 }) => {
   const [creds, setCreds] = useState<SyncCredentials | null>(null);
-  const [syncKey, setSyncKey] = useState("");
-  const [pin, setPin] = useState("");
+  const [tab, setTab] = useState<"login" | "register">("login");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -42,18 +43,18 @@ export const SyncModal: React.FC<SyncModalProps> = ({
       const current = SyncService.getCredentials();
       setCreds(current);
       if (current) {
-        setSyncKey(current.syncKey);
+        setUsername(current.username);
       }
       setErrorMsg(null);
       setSuccessMsg(null);
-      updateLastSyncText();
+      updateSyncTimeLabel();
     }
   }, [isOpen]);
 
-  const updateLastSyncText = () => {
+  const updateSyncTimeLabel = () => {
     const ts = SyncService.getLastSyncTime();
     if (!ts) {
-      setLastSyncText("এখনো কোনো সিঙ্ক হয়নি");
+      setLastSyncText("এইমাত্র");
       return;
     }
     const diff = Math.floor((Date.now() - ts) / 1000);
@@ -71,41 +72,61 @@ export const SyncModal: React.FC<SyncModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleConnect = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!syncKey.trim()) {
-      setErrorMsg("দয়া করে আপনার একটি নাম বা Sync Key দিন।");
+    const cleanUser = username.trim().toLowerCase();
+    const cleanPass = password.trim();
+
+    if (!cleanUser || cleanUser.length < 2) {
+      setErrorMsg("দয়া করে অন্তত ২ অক্ষরের একটি ইউজারনেম দিন।");
       return;
     }
-    if (pin.trim().length !== 4 || !/^\d{4}$/.test(pin.trim())) {
-      setErrorMsg("পিন অবশ্যই ৪ ডিজিটের সংখ্যা (যেমন: ১২৩৪) হতে হবে।");
+    if (!cleanPass || cleanPass.length < 3) {
+      setErrorMsg("পাসওয়ার্ড অন্তত ৩ অক্ষরের হতে হবে।");
       return;
     }
 
     setLoading(true);
-    const result = await SyncService.connectAccount(syncKey, pin);
-    setLoading(false);
 
-    if (result.ok) {
-      setCreds(SyncService.getCredentials());
-      setSuccessMsg(
-        result.isNew
-          ? "মাশাআল্লাহ! নতুন সিঙ্ক একাউন্ট তৈরি ও কানেক্ট হয়েছে।"
-          : "সফলভাবে ডিভাইসের সাথে সিঙ্ক কানেক্ট হয়েছে!",
-      );
-      updateLastSyncText();
+    if (tab === "login") {
+      // LOGIN
+      const res = await SyncService.login(cleanUser, cleanPass);
+      setLoading(false);
 
-      if (result.payload) {
-        onDataSynced({
-          lastRead: result.payload.lastRead,
-          timerStats: result.payload.timerStats,
-        });
+      if (res.ok) {
+        const updated = SyncService.getCredentials();
+        setCreds(updated);
+        setSuccessMsg(
+          "সফলভাবে লগইন হয়েছে! আপনার পড়ার অগ্রগতি সিঙ্ক করা হয়েছে।",
+        );
+        updateSyncTimeLabel();
+        if (res.payload) {
+          onDataSynced({
+            lastRead: res.payload.lastRead,
+            timerStats: res.payload.timerStats,
+          });
+        }
+      } else {
+        setErrorMsg(res.error || "লগইন করা সম্ভব হয়নি।");
       }
     } else {
-      setErrorMsg(result.error || "কানেক্ট করা সম্ভব হয়নি।");
+      // REGISTER
+      const res = await SyncService.register(cleanUser, cleanPass);
+      setLoading(false);
+
+      if (res.ok) {
+        const updated = SyncService.getCredentials();
+        setCreds(updated);
+        setSuccessMsg(
+          "মাশাআল্লাহ! অ্যাকাউন্ট তৈরি ও লগইন সফল হয়েছে। এখন সব ডিভাইসে অটো-সিঙ্ক হবে।",
+        );
+        updateSyncTimeLabel();
+      } else {
+        setErrorMsg(res.error || "অ্যাকাউন্ট তৈরি করা যায়নি।");
+      }
     }
   };
 
@@ -114,7 +135,6 @@ export const SyncModal: React.FC<SyncModalProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    // 1. Pull latest from cloud
     const pullRes = await SyncService.pullData();
     if (pullRes.ok) {
       if (pullRes.hasChanges) {
@@ -123,9 +143,8 @@ export const SyncModal: React.FC<SyncModalProps> = ({
           timerStats: pullRes.mergedStats,
         });
       }
-      // 2. Push local current state
       await SyncService.pushData();
-      updateLastSyncText();
+      updateSyncTimeLabel();
       setSuccessMsg("সর্বশেষ ডাটা সফলভাবে ক্লাউডে সিঙ্ক হয়েছে!");
     } else {
       setErrorMsg(pullRes.error || "সিঙ্ক করতে সমস্যা হয়েছে।");
@@ -133,16 +152,16 @@ export const SyncModal: React.FC<SyncModalProps> = ({
     setLoading(false);
   };
 
-  const handleDisconnect = () => {
+  const handleLogout = () => {
     if (
       window.confirm(
-        "আপনি কি এই ডিভাইস থেকে সিঙ্ক সংযোগ বিচ্ছিন্ন করতে চান? আপনার ব্রাউজারের বর্তমান ডাটা ডিলিট হবে না।",
+        "আপনি কি এই ডিভাইস থেকে লগআউট করতে চান? আপনার ব্রাউজারের বর্তমান পড়ার ডাটা মুছে যাবে না।",
       )
     ) {
       SyncService.clearCredentials();
       setCreds(null);
-      setPin("");
-      setSuccessMsg("সিঙ্ক সফলভাবে বিচ্ছিন্ন করা হয়েছে।");
+      setPassword("");
+      setSuccessMsg("লগআউট সফল হয়েছে।");
     }
   };
 
@@ -156,17 +175,17 @@ export const SyncModal: React.FC<SyncModalProps> = ({
         className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90dvh] cursor-default"
       >
         {/* Modal Header */}
-        <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50/50 shrink-0">
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50/60 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-xs">
-              <Cloud className="w-5 h-5" />
+              <User className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                মোবাইল ও পিসি অটো-সিঙ্ক
+                {creds ? "আপনার অ্যাকাউন্ট ও সিঙ্ক" : "কুরআন অ্যাকাউন্ট"}
               </h3>
               <p className="text-[11px] text-emerald-800">
-                Cloudflare ক্লাউডে পড়ার স্থান ও স্ট্রিক ব্যাকআপ
+                মোবাইল, পিসি ও আইপ্যাডে অটো-সিঙ্ক
               </p>
             </div>
           </div>
@@ -180,12 +199,12 @@ export const SyncModal: React.FC<SyncModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
-          {/* Status Message */}
+        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+          {/* Alerts */}
           {errorMsg && (
             <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div className="leading-relaxed">{errorMsg}</div>
+              <div className="leading-relaxed font-medium">{errorMsg}</div>
             </div>
           )}
 
@@ -197,43 +216,41 @@ export const SyncModal: React.FC<SyncModalProps> = ({
           )}
 
           {creds ? (
-            /* Connected State */
+            /* Logged In View */
             <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white border border-emerald-200/90 space-y-3">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/80 via-teal-50/40 to-white border border-emerald-200/90 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-100/80 px-2.5 py-1 rounded-full">
-                    <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                    ডিভাইস সংযুক্ত আছে
-                  </span>
-                  <span className="text-[11px] text-slate-500">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-sm flex items-center justify-center uppercase shadow-2xs">
+                      {creds.username.charAt(0)}
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block">
+                        {creds.username}
+                      </span>
+                      <span className="text-[10px] text-emerald-700 flex items-center gap-1 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                        অটো-সিঙ্ক সক্রিয়
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
                     সিঙ্ক: {lastSyncText}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div className="p-2.5 rounded-xl bg-white/80 border border-emerald-100">
-                    <span className="text-[10px] text-slate-400 font-medium block">
-                      Sync নাম
-                    </span>
-                    <span className="text-sm font-bold text-slate-800 truncate block">
-                      {creds.syncKey}
-                    </span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white/80 border border-emerald-100">
-                    <span className="text-[10px] text-slate-400 font-medium block">
-                      গোপন পিন
-                    </span>
-                    <span className="text-sm font-bold text-slate-800 tracking-widest block">
-                      ••••
-                    </span>
-                  </div>
+                <div className="p-3 rounded-xl bg-white/90 border border-emerald-100 text-xs text-slate-600 leading-relaxed space-y-1">
+                  <p className="flex items-center gap-1.5 font-semibold text-emerald-900">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    কোনো বাটন চাপতে হবে না!
+                  </p>
+                  <p>
+                    আপনি আয়াত পড়লে বা পড়ার স্থান চিহ্নিত করলেই তা স্বয়ংক্রিয়ভাবে
+                    ক্লাউডে সেভ হবে। অন্য ডিভাইসে শুধু{" "}
+                    <b className="text-slate-800">{creds.username}</b> দিয়ে লগইন
+                    করলেই সব পড়া দেখতে পাবেন।
+                  </p>
                 </div>
-
-                <p className="text-[11px] text-emerald-700/90 leading-relaxed pt-1">
-                  💡 আপনার অন্য ডিভাইসেও (যেমন মোবাইল) ঠিক এই একই{" "}
-                  <b>Sync নাম ({creds.syncKey})</b> এবং <b>পিন</b> দিলে
-                  স্বয়ংক্রিয়ভাবে দুটি ডিভাইসের ডাটা সিঙ্ক হয়ে যাবে।
-                </p>
               </div>
 
               {/* Action Buttons */}
@@ -246,107 +263,138 @@ export const SyncModal: React.FC<SyncModalProps> = ({
                   <RefreshCw
                     className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
                   />
-                  <span>{loading ? "সিঙ্ক হচ্ছে..." : "এখনই সিঙ্ক করুন"}</span>
+                  <span>
+                    {loading ? "সিঙ্ক হচ্ছে..." : "এখনই রিফ্রেশ করুন"}
+                  </span>
                 </button>
 
                 <button
-                  onClick={handleDisconnect}
+                  onClick={handleLogout}
                   disabled={loading}
-                  className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  title="সংযোগ বিচ্ছিন্ন করুন"
+                  className="py-2.5 px-3.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  title="লগআউট করুন"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span>ডিসকানেক্ট</span>
+                  <span>লগআউট</span>
                 </button>
               </div>
             </div>
           ) : (
-            /* Not Connected State (Form) */
-            <form onSubmit={handleConnect} className="space-y-4">
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 space-y-1.5 leading-relaxed">
-                <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                  <Smartphone className="w-4 h-4 text-emerald-700" />
-                  <span>মোবাইল ও পিসিতে সিঙ্ক করার সহজ নিয়ম:</span>
-                </div>
-                <p>
-                  ১. আপনার পছন্দমতো যেকোনো নাম (যেমন:{" "}
-                  <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono text-emerald-800">
-                    tamim
-                  </code>
-                  ) এবং ৪ ডিজিটের একটি গোপন পিন দিন।
-                </p>
-                <p>
-                  ২. মোবাইলে গিয়েও ঠিক একই নাম ও পিন দিলে সাথে সাথে দুটি ডিভাইস
-                  সিঙ্ক হয়ে যাবে!
-                </p>
+            /* Logged Out View: Tabs & Form */
+            <div className="space-y-4">
+              {/* Login / Register Switch Tabs */}
+              <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab("login");
+                    setErrorMsg(null);
+                  }}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    tab === "login"
+                      ? "bg-white text-emerald-800 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>লগইন</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab("register");
+                    setErrorMsg(null);
+                  }}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    tab === "register"
+                      ? "bg-white text-emerald-800 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>নতুন অ্যাকাউন্ট</span>
+                </button>
               </div>
 
-              {/* Input: Sync Key */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700">
-                  আপনার Sync নাম / ইউজারনেম
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={syncKey}
-                    onChange={(e) => setSyncKey(e.target.value)}
-                    placeholder="যেমন: tamim"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 transition-all"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Input: PIN */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-700">
-                    ৪ ডিজিটের গোপন পিন (PIN)
-                  </label>
-                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-emerald-600" /> শুধু
-                    আপনার জানা থাকবে
-                  </span>
-                </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={4}
-                    value={pin}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, "");
-                      if (v.length <= 4) setPin(v);
-                    }}
-                    placeholder="যেমন: 1234"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 transition-all tracking-widest"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-900/10 cursor-pointer disabled:opacity-50 mt-2"
-              >
-                {loading ? (
+              {/* Explanatory Banner */}
+              <p className="text-xs text-slate-600 leading-relaxed">
+                {tab === "login" ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>কানেক্ট হচ্ছে...</span>
+                    আগে অ্যাকাউন্ট খুলে থাকলে আপনার <b>ইউজারনেম</b> ও{" "}
+                    <b>পাসওয়ার্ড</b> দিয়ে লগইন করুন। সব ডিভাইসের পড়ার অগ্রগতি
+                    অটোমেটিক চলে আসবে।
                   </>
                 ) : (
                   <>
-                    <Cloud className="w-4 h-4" />
-                    <span>সিঙ্ক চালু করুন</span>
+                    আপনার পছন্দমতো যেকোনো <b>ইউজারনেম</b> এবং <b>পাসওয়ার্ড</b>{" "}
+                    দিয়ে একটি সহজ অ্যাকাউন্ট খুলুন।
                   </>
                 )}
-              </button>
-            </form>
+              </p>
+
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="space-y-3.5">
+                {/* Username Input */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    ইউজারনেম / আপনার নাম
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="যেমন: tamim"
+                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Password Input */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    পাসওয়ার্ড
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="আপনার গোপন পাসওয়ার্ড দিন"
+                      className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-900/10 cursor-pointer disabled:opacity-50 mt-1"
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>অপেক্ষা করুন...</span>
+                    </>
+                  ) : tab === "login" ? (
+                    <>
+                      <LogIn className="w-4 h-4" />
+                      <span>লগইন করুন</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>অ্যাকাউন্ট তৈরি করুন</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
           )}
         </div>
       </div>

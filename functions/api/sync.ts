@@ -1,18 +1,18 @@
 // Cloudflare Pages Function: /api/sync
-// Supports Cloudflare D1 (recommended) and Cloudflare KV as fallback
+// Simple & Reliable User Account & Auto-Sync System using Cloudflare D1 (with KV fallback)
 
 interface Env {
   DB?: D1Database; // Cloudflare D1 Database binding
   SYNC_KV?: KVNamespace; // Cloudflare KV binding
 }
 
-interface SyncRecord {
+interface UserRecord {
   pin_hash: string;
   data: string;
   updated_at: number;
 }
 
-// Auto-initialize SQLite table if using Cloudflare D1
+// Ensure SQLite table exists
 async function ensureD1Table(db: D1Database) {
   try {
     await db
@@ -30,45 +30,60 @@ async function ensureD1Table(db: D1Database) {
   }
 }
 
+// GET /api/sync?username=...&passwordHash=...
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const url = new URL(context.request.url);
-  const syncKey = url.searchParams.get("key")?.trim().toLowerCase();
-  const pinHash = url.searchParams.get("pinHash")?.trim();
+  const username = (
+    url.searchParams.get("username") ||
+    url.searchParams.get("key") ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+  const passwordHash = (
+    url.searchParams.get("passwordHash") ||
+    url.searchParams.get("pinHash") ||
+    ""
+  ).trim();
 
-  if (!syncKey || !pinHash) {
+  if (!username || !passwordHash) {
     return new Response(
-      JSON.stringify({ ok: false, error: "Sync Key এবং Pin Hash প্রয়োজন।" }),
+      JSON.stringify({
+        ok: false,
+        error: "ইউজারনেম এবং পাসওয়ার্ড প্রদান করুন।",
+      }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
 
   const { DB, SYNC_KV } = context.env;
 
-  // 1. D1 Database Storage
+  // 1. D1 Database
   if (DB) {
     try {
       await ensureD1Table(DB);
       const row = await DB.prepare(
         "SELECT pin_hash, data, updated_at FROM sync_store WHERE sync_key = ?",
       )
-        .bind(syncKey)
-        .first<SyncRecord>();
+        .bind(username)
+        .first<UserRecord>();
 
       if (!row) {
         return new Response(
           JSON.stringify({
             ok: false,
-            error: "এই কি (Key) দিয়ে কোনো একাউন্ট পাওয়া যায়নি।",
+            error:
+              "এই নামে কোনো অ্যাকাউন্ট পাওয়া যায়নি। আগে রেজিস্ট্রেশন করুন।",
           }),
           { status: 404, headers: { "Content-Type": "application/json" } },
         );
       }
 
-      if (row.pin_hash !== pinHash) {
+      if (row.pin_hash !== passwordHash) {
         return new Response(
           JSON.stringify({
             ok: false,
-            error: "ভুল পিন! সঠিক ৪ ডিজিটের গোপন পিন দিন।",
+            error: "ভুল পাসওয়ার্ড! সঠিক পাসওয়ার্ড দিন।",
           }),
           { status: 401, headers: { "Content-Type": "application/json" } },
         );
@@ -86,33 +101,33 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       return new Response(
         JSON.stringify({
           ok: false,
-          error: "D1 ডাটাবেজ এরর: " + (e?.message || e),
+          error: "D1 ডাটাবেজ সমস্যা: " + (e?.message || e),
         }),
         { status: 500, headers: { "Content-Type": "application/json" } },
       );
     }
   }
 
-  // 2. Fallback: Cloudflare KV Storage
+  // 2. Fallback KV
   if (SYNC_KV) {
     try {
-      const raw = await SYNC_KV.get(`sync_${syncKey}`);
+      const raw = await SYNC_KV.get(`user_${username}`);
       if (!raw) {
         return new Response(
           JSON.stringify({
             ok: false,
-            error: "এই কি (Key) দিয়ে কোনো একাউন্ট পাওয়া যায়নি।",
+            error: "এই নামে কোনো অ্যাকাউন্ট পাওয়া যায়নি।",
           }),
           { status: 404, headers: { "Content-Type": "application/json" } },
         );
       }
 
-      const record: SyncRecord = JSON.parse(raw);
-      if (record.pin_hash !== pinHash) {
+      const record: UserRecord = JSON.parse(raw);
+      if (record.pin_hash !== passwordHash) {
         return new Response(
           JSON.stringify({
             ok: false,
-            error: "ভুল পিন! সঠিক ৪ ডিজিটের গোপন পিন দিন।",
+            error: "ভুল পাসওয়ার্ড! সঠিক পাসওয়ার্ড দিন।",
           }),
           { status: 401, headers: { "Content-Type": "application/json" } },
         );
@@ -128,7 +143,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       );
     } catch (e: any) {
       return new Response(
-        JSON.stringify({ ok: false, error: "KV এরর: " + (e?.message || e) }),
+        JSON.stringify({ ok: false, error: "KV সমস্যা: " + (e?.message || e) }),
         { status: 500, headers: { "Content-Type": "application/json" } },
       );
     }
@@ -137,13 +152,14 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   return new Response(
     JSON.stringify({
       ok: false,
-      error:
-        "Cloudflare D1 বা KV এখনো সংযুক্ত করা হয়নি। Cloudflare Dashboard -> Pages -> Settings -> Functions এ গিয়ে D1 Database binding 'DB' যুক্ত করুন।",
+      error: "Cloudflare D1 ডাটাবেজ বাইন্ডিং 'DB' পাওয়া যায়নি।",
     }),
     { status: 503, headers: { "Content-Type": "application/json" } },
   );
 };
 
+// POST /api/sync
+// Supported actions: "login", "register", "push", "pull"
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   let body: any;
   try {
@@ -156,68 +172,94 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   const action = body.action || "push";
-  const syncKey = body.syncKey?.trim().toLowerCase();
-  const pinHash = body.pinHash?.trim();
+  const username = (body.username || body.syncKey || "").trim().toLowerCase();
+  const passwordHash = (body.passwordHash || body.pinHash || "").trim();
   const data = body.data;
   const now = Date.now();
 
-  if (!syncKey || !pinHash) {
+  if (!username || !passwordHash) {
     return new Response(
-      JSON.stringify({ ok: false, error: "Sync Key এবং Pin Hash প্রয়োজন।" }),
+      JSON.stringify({
+        ok: false,
+        error: "ইউজারনেম এবং পাসওয়ার্ড প্রদান করুন।",
+      }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
 
   const { DB, SYNC_KV } = context.env;
 
-  // 1. D1 Database Storage
+  // 1. D1 Database
   if (DB) {
     try {
       await ensureD1Table(DB);
+
+      // Check existing user
       const existing = await DB.prepare(
         "SELECT pin_hash, data, updated_at FROM sync_store WHERE sync_key = ?",
       )
-        .bind(syncKey)
-        .first<SyncRecord>();
+        .bind(username)
+        .first<UserRecord>();
 
-      if (!existing) {
-        // Register new sync account
+      // ACTION: REGISTER
+      if (action === "register") {
+        if (existing) {
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              error:
+                "এই নামে ইতিমধ্যে একটি অ্যাকাউন্ট রয়েছে। লগইন করুন অথবা অন্য নাম বেছে নিন।",
+            }),
+            { status: 409, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
         const initialData = JSON.stringify(data || {});
         await DB.prepare(
           "INSERT INTO sync_store (sync_key, pin_hash, data, updated_at) VALUES (?, ?, ?, ?)",
         )
-          .bind(syncKey, pinHash, initialData, now)
+          .bind(username, passwordHash, initialData, now)
           .run();
 
         return new Response(
           JSON.stringify({
             ok: true,
             isNew: true,
-            message: "নতুন Sync একাউন্ট সফলভাবে তৈরি হয়েছে।",
+            message: "অভিনন্দন! অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে।",
             data: data || null,
           }),
           { headers: { "Content-Type": "application/json" } },
         );
       }
 
-      // Existing record check PIN
-      if (existing.pin_hash !== pinHash) {
-        return new Response(
-          JSON.stringify({
-            ok: false,
-            error: "ভুল পিন! সঠিক ৪ ডিজিটের গোপন পিন দিন।",
-          }),
-          { status: 401, headers: { "Content-Type": "application/json" } },
-        );
-      }
+      // ACTION: LOGIN
+      if (action === "login" || action === "connect") {
+        if (!existing) {
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              error:
+                "এই নামে কোনো অ্যাকাউন্ট পাওয়া যায়নি। দয়া করে আগে নতুন অ্যাকাউন্ট তৈরি (Register) করুন।",
+            }),
+            { status: 404, headers: { "Content-Type": "application/json" } },
+          );
+        }
 
-      if (action === "connect") {
-        // Just connecting to existing device
+        if (existing.pin_hash !== passwordHash) {
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              error: "ভুল পাসওয়ার্ড! দয়া করে সঠিক পাসওয়ার্ড দিন।",
+            }),
+            { status: 401, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
         return new Response(
           JSON.stringify({
             ok: true,
             isNew: false,
-            message: "সফলভাবে সংযুক্ত হয়েছে।",
+            message: "সফলভাবে লগইন হয়েছে!",
             data: JSON.parse(existing.data),
             updatedAt: existing.updated_at,
           }),
@@ -225,18 +267,60 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         );
       }
 
-      // Update data
-      const updatedData = JSON.stringify(data || {});
-      await DB.prepare(
-        "UPDATE sync_store SET data = ?, updated_at = ? WHERE sync_key = ?",
-      )
-        .bind(updatedData, now, syncKey)
-        .run();
+      // ACTION: PUSH (Update reading progress)
+      if (action === "push") {
+        if (!existing) {
+          // If pushing for newly connected account
+          const initialData = JSON.stringify(data || {});
+          await DB.prepare(
+            "INSERT INTO sync_store (sync_key, pin_hash, data, updated_at) VALUES (?, ?, ?, ?)",
+          )
+            .bind(username, passwordHash, initialData, now)
+            .run();
 
-      return new Response(
-        JSON.stringify({ ok: true, message: "ডাটা সফলভাবে সেভ হয়েছে।" }),
-        { headers: { "Content-Type": "application/json" } },
-      );
+          return new Response(
+            JSON.stringify({ ok: true, message: "ডাটা সেভ হয়েছে।" }),
+            { headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        if (existing.pin_hash !== passwordHash) {
+          return new Response(
+            JSON.stringify({ ok: false, error: "ভুল ক্রেডেনশিয়াল।" }),
+            { status: 401, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        const updatedData = JSON.stringify(data || {});
+        await DB.prepare(
+          "UPDATE sync_store SET data = ?, updated_at = ? WHERE sync_key = ?",
+        )
+          .bind(updatedData, now, username)
+          .run();
+
+        return new Response(
+          JSON.stringify({ ok: true, message: "ডাটা সেভ হয়েছে।" }),
+          { headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      // ACTION: PULL
+      if (action === "pull") {
+        if (!existing || existing.pin_hash !== passwordHash) {
+          return new Response(
+            JSON.stringify({ ok: false, error: "অননুমোদিত রিকোয়েস্ট।" }),
+            { status: 401, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            data: JSON.parse(existing.data),
+            updatedAt: existing.updated_at,
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        );
+      }
     } catch (e: any) {
       return new Response(
         JSON.stringify({
@@ -248,45 +332,63 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
   }
 
-  // 2. Fallback: Cloudflare KV
+  // 2. Fallback KV
   if (SYNC_KV) {
     try {
-      const raw = await SYNC_KV.get(`sync_${syncKey}`);
-      if (!raw) {
-        const record: SyncRecord = {
-          pin_hash: pinHash,
+      const raw = await SYNC_KV.get(`user_${username}`);
+      const existing: UserRecord | null = raw ? JSON.parse(raw) : null;
+
+      if (action === "register") {
+        if (existing) {
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              error: "এই নামে ইতিমধ্যে অ্যাকাউন্ট রয়েছে। লগইন করুন।",
+            }),
+            { status: 409, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        const newRec: UserRecord = {
+          pin_hash: passwordHash,
           data: JSON.stringify(data || {}),
           updated_at: now,
         };
-        await SYNC_KV.put(`sync_${syncKey}`, JSON.stringify(record));
+        await SYNC_KV.put(`user_${username}`, JSON.stringify(newRec));
+
         return new Response(
           JSON.stringify({
             ok: true,
             isNew: true,
-            message: "নতুন Sync একাউন্ট তৈরি হয়েছে।",
+            message: "অ্যাকাউন্ট তৈরি হয়েছে!",
             data: data || null,
           }),
           { headers: { "Content-Type": "application/json" } },
         );
       }
 
-      const existing: SyncRecord = JSON.parse(raw);
-      if (existing.pin_hash !== pinHash) {
-        return new Response(
-          JSON.stringify({
-            ok: false,
-            error: "ভুল পিন! সঠিক ৪ ডিজিটের গোপন পিন দিন।",
-          }),
-          { status: 401, headers: { "Content-Type": "application/json" } },
-        );
-      }
-
-      if (action === "connect") {
+      if (action === "login" || action === "connect") {
+        if (!existing) {
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              error:
+                "এই নামে কোনো অ্যাকাউন্ট পাওয়া যায়নি। আগে রেজিস্ট্রেশন করুন।",
+            }),
+            { status: 404, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        if (existing.pin_hash !== passwordHash) {
+          return new Response(
+            JSON.stringify({ ok: false, error: "ভুল পাসওয়ার্ড!" }),
+            { status: 401, headers: { "Content-Type": "application/json" } },
+          );
+        }
         return new Response(
           JSON.stringify({
             ok: true,
             isNew: false,
-            message: "সফলভাবে সংযুক্ত হয়েছে।",
+            message: "লগইন সফল!",
             data: JSON.parse(existing.data),
             updatedAt: existing.updated_at,
           }),
@@ -294,14 +396,24 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         );
       }
 
-      existing.data = JSON.stringify(data || {});
-      existing.updated_at = now;
-      await SYNC_KV.put(`sync_${syncKey}`, JSON.stringify(existing));
-
-      return new Response(
-        JSON.stringify({ ok: true, message: "ডাটা সফলভাবে সেভ হয়েছে।" }),
-        { headers: { "Content-Type": "application/json" } },
-      );
+      if (action === "push") {
+        if (existing && existing.pin_hash !== passwordHash) {
+          return new Response(
+            JSON.stringify({ ok: false, error: "ভুল ক্রেডেনশিয়াল।" }),
+            { status: 401, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        const updatedRec: UserRecord = {
+          pin_hash: passwordHash,
+          data: JSON.stringify(data || {}),
+          updated_at: now,
+        };
+        await SYNC_KV.put(`user_${username}`, JSON.stringify(updatedRec));
+        return new Response(
+          JSON.stringify({ ok: true, message: "ডাটা সেভ হয়েছে।" }),
+          { headers: { "Content-Type": "application/json" } },
+        );
+      }
     } catch (e: any) {
       return new Response(
         JSON.stringify({ ok: false, error: "KV এরর: " + (e?.message || e) }),
@@ -313,8 +425,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   return new Response(
     JSON.stringify({
       ok: false,
-      error:
-        "Cloudflare D1 বা KV এখনো সংযুক্ত করা হয়নি। Cloudflare Dashboard -> Pages -> Settings -> Functions এ গিয়ে D1 Database binding 'DB' যুক্ত করুন।",
+      error: "D1 বা KV ডাটাবেজ কানেকশন পাওয়া যায়নি।",
     }),
     { status: 503, headers: { "Content-Type": "application/json" } },
   );

@@ -31,6 +31,9 @@ function App() {
   const [isSyncConnected, setIsSyncConnected] = useState<boolean>(
     () => !!SyncService.getCredentials(),
   );
+  const [loggedInUsername, setLoggedInUsername] = useState<string | null>(
+    () => SyncService.getCredentials()?.username || null,
+  );
 
   const unsavedSecondsRef = useRef<number>(0);
 
@@ -81,8 +84,10 @@ function App() {
     setTimerStats(TimerService.getStats());
 
     // Auto-sync if connected
-    if (SyncService.getCredentials()) {
+    const creds = SyncService.getCredentials();
+    if (creds) {
       setIsSyncConnected(true);
+      setLoggedInUsername(creds.username);
       SyncService.pullData().then((res) => {
         if (res.ok && res.hasChanges) {
           if (res.mergedLastRead !== undefined) setLastRead(res.mergedLastRead);
@@ -137,10 +142,13 @@ function App() {
         };
       });
 
-      // Persist to storage every 5 seconds
-      if (unsavedSecondsRef.current >= 5) {
+      // Persist to storage & cloud every 10 seconds
+      if (unsavedSecondsRef.current >= 10) {
         TimerService.addSeconds(unsavedSecondsRef.current);
         unsavedSecondsRef.current = 0;
+        if (SyncService.getCredentials()) {
+          SyncService.pushData();
+        }
       }
     }, 1000);
 
@@ -202,6 +210,7 @@ function App() {
         onToggleTimer={() => setIsTimerRunning((r) => !r)}
         onOpenGoalModal={() => setIsGoalModalOpen(true)}
         isSyncConnected={isSyncConnected}
+        loggedInUsername={loggedInUsername}
         onOpenSyncModal={() => setIsSyncModalOpen(true)}
       />
 
@@ -275,17 +284,21 @@ function App() {
         }}
       />
 
-      {/* Cloud Sync Modal */}
+      {/* Cloud Sync / Account Modal */}
       <SyncModal
         isOpen={isSyncModalOpen}
         onClose={() => {
           setIsSyncModalOpen(false);
-          setIsSyncConnected(!!SyncService.getCredentials());
+          const current = SyncService.getCredentials();
+          setIsSyncConnected(!!current);
+          setLoggedInUsername(current?.username || null);
         }}
         onDataSynced={({ lastRead: lr, timerStats: ts }) => {
           if (lr !== undefined) setLastRead(lr);
           if (ts) setTimerStats(ts);
-          setIsSyncConnected(!!SyncService.getCredentials());
+          const current = SyncService.getCredentials();
+          setIsSyncConnected(!!current);
+          setLoggedInUsername(current?.username || null);
         }}
       />
 

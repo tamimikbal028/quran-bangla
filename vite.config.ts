@@ -23,28 +23,39 @@ function localSyncMockPlugin(): Plugin {
         };
 
         if (req.method === "GET") {
-          const syncKey = url.searchParams.get("key")?.trim().toLowerCase();
-          const pinHash = url.searchParams.get("pinHash")?.trim();
+          const username = (
+            url.searchParams.get("username") ||
+            url.searchParams.get("key") ||
+            ""
+          )
+            .trim()
+            .toLowerCase();
+          const passwordHash = (
+            url.searchParams.get("passwordHash") ||
+            url.searchParams.get("pinHash") ||
+            ""
+          ).trim();
 
-          if (!syncKey || !pinHash) {
+          if (!username || !passwordHash) {
             return sendJson(400, {
               ok: false,
-              error: "Sync Key এবং Pin Hash প্রয়োজন।",
+              error: "ইউজারনেম এবং পাসওয়ার্ড প্রদান করুন।",
             });
           }
 
-          const record = store.get(syncKey);
+          const record = store.get(username);
           if (!record) {
             return sendJson(404, {
               ok: false,
-              error: "এই কি (Key) দিয়ে কোনো ডাটা পাওয়া যায়নি।",
+              error:
+                "এই নামে কোনো অ্যাকাউন্ট পাওয়া যায়নি। আগে রেজিস্ট্রেশন করুন।",
             });
           }
 
-          if (record.pinHash !== pinHash) {
+          if (record.pinHash !== passwordHash) {
             return sendJson(401, {
               ok: false,
-              error: "ভুল পিন! সঠিক ৪ ডিজিটের গোপন পিন দিন।",
+              error: "ভুল পাসওয়ার্ড! সঠিক পাসওয়ার্ড দিন।",
             });
           }
 
@@ -65,60 +76,112 @@ function localSyncMockPlugin(): Plugin {
             try {
               const parsed = JSON.parse(body || "{}");
               const action = parsed.action || "push";
-              const syncKey = parsed.syncKey?.trim().toLowerCase();
-              const pinHash = parsed.pinHash?.trim();
+              const username = (parsed.username || parsed.syncKey || "")
+                .trim()
+                .toLowerCase();
+              const passwordHash = (
+                parsed.passwordHash ||
+                parsed.pinHash ||
+                ""
+              ).trim();
               const data = parsed.data;
               const now = Date.now();
 
-              if (!syncKey || !pinHash) {
+              if (!username || !passwordHash) {
                 return sendJson(400, {
                   ok: false,
-                  error: "Sync Key এবং Pin Hash প্রয়োজন।",
+                  error: "ইউজারনেম এবং পাসওয়ার্ড প্রদান করুন।",
                 });
               }
 
-              const existing = store.get(syncKey);
+              const existing = store.get(username);
 
-              if (!existing) {
-                // Register
-                store.set(syncKey, {
-                  pinHash,
+              if (action === "register") {
+                if (existing) {
+                  return sendJson(409, {
+                    ok: false,
+                    error:
+                      "এই নামে ইতিমধ্যে অ্যাকাউন্ট রয়েছে। লগইন করুন অথবা অন্য নাম বেছে নিন।",
+                  });
+                }
+                store.set(username, {
+                  pinHash: passwordHash,
                   data: JSON.stringify(data || {}),
                   updatedAt: now,
                 });
                 return sendJson(200, {
                   ok: true,
                   isNew: true,
-                  message: "নতুন Sync একাউন্ট তৈরি হয়েছে।",
+                  message: "অভিনন্দন! অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে।",
                   data: data || null,
                 });
               }
 
-              if (existing.pinHash !== pinHash) {
-                return sendJson(401, {
-                  ok: false,
-                  error: "ভুল পিন! সঠিক ৪ ডিজিটের গোপন পিন দিন।",
-                });
-              }
-
-              if (action === "connect") {
+              if (action === "login" || action === "connect") {
+                if (!existing) {
+                  return sendJson(404, {
+                    ok: false,
+                    error:
+                      "এই নামে কোনো অ্যাকাউন্ট পাওয়া যায়নি। আগে নতুন অ্যাকাউন্ট তৈরি (Register) করুন।",
+                  });
+                }
+                if (existing.pinHash !== passwordHash) {
+                  return sendJson(401, {
+                    ok: false,
+                    error: "ভুল পাসওয়ার্ড! দয়া করে সঠিক পাসওয়ার্ড দিন।",
+                  });
+                }
                 return sendJson(200, {
                   ok: true,
                   isNew: false,
-                  message: "সফলভাবে সংযুক্ত হয়েছে।",
+                  message: "সফলভাবে লগইন হয়েছে!",
                   data: JSON.parse(existing.data),
                   updatedAt: existing.updatedAt,
                 });
               }
 
-              existing.data = JSON.stringify(data || {});
-              existing.updatedAt = now;
-              store.set(syncKey, existing);
+              if (action === "push") {
+                if (!existing) {
+                  store.set(username, {
+                    pinHash: passwordHash,
+                    data: JSON.stringify(data || {}),
+                    updatedAt: now,
+                  });
+                  return sendJson(200, {
+                    ok: true,
+                    message: "ডাটা সেভ হয়েছে।",
+                  });
+                }
+                if (existing.pinHash !== passwordHash) {
+                  return sendJson(401, {
+                    ok: false,
+                    error: "ভুল ক্রেডেনশিয়াল।",
+                  });
+                }
+                existing.data = JSON.stringify(data || {});
+                existing.updatedAt = now;
+                store.set(username, existing);
+                return sendJson(200, {
+                  ok: true,
+                  message: "ডাটা সেভ হয়েছে।",
+                });
+              }
 
-              return sendJson(200, {
-                ok: true,
-                message: "ডাটা সফলভাবে সেভ হয়েছে।",
-              });
+              if (action === "pull") {
+                if (!existing || existing.pinHash !== passwordHash) {
+                  return sendJson(401, {
+                    ok: false,
+                    error: "অননুমোদিত রিকোয়েস্ট।",
+                  });
+                }
+                return sendJson(200, {
+                  ok: true,
+                  data: JSON.parse(existing.data),
+                  updatedAt: existing.updatedAt,
+                });
+              }
+
+              return sendJson(400, { ok: false, error: "Unknown action" });
             } catch {
               return sendJson(400, {
                 ok: false,

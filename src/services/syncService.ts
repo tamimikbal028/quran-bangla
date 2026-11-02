@@ -10,20 +10,18 @@ export interface SyncPayload {
 }
 
 export interface SyncCredentials {
-  syncKey: string;
-  pin: string;
+  username: string;
+  passwordHash: string;
   lastSyncedAt?: number;
 }
 
-export type SyncStatus = "idle" | "syncing" | "synced" | "error";
+const STORAGE_CREDS_KEY = "quran_bn_user_creds";
+const STORAGE_LAST_SYNC_KEY = "quran_bn_last_sync_time";
 
-const SYNC_CREDS_KEY = "quran_bn_sync_creds";
-const LAST_SYNC_TIME_KEY = "quran_bn_last_sync_time";
-
-// SHA-256 hash using native Web Crypto
-export async function hashPin(pin: string): Promise<string> {
+// Secure SHA-256 password hash using standard browser Web Crypto
+export async function hashPassword(password: string): Promise<string> {
   const enc = new TextEncoder();
-  const data = enc.encode(`quran_bn_salt_${pin.trim()}`);
+  const data = enc.encode(`quran_bn_salt_${password.trim()}`);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -32,10 +30,10 @@ export async function hashPin(pin: string): Promise<string> {
 export const SyncService = {
   getCredentials(): SyncCredentials | null {
     try {
-      const raw = localStorage.getItem(SYNC_CREDS_KEY);
+      const raw = localStorage.getItem(STORAGE_CREDS_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      if (parsed.syncKey && parsed.pin) {
+      if (parsed.username && parsed.passwordHash) {
         return parsed;
       }
       return null;
@@ -46,24 +44,24 @@ export const SyncService = {
 
   setCredentials(creds: SyncCredentials): void {
     try {
-      localStorage.setItem(SYNC_CREDS_KEY, JSON.stringify(creds));
+      localStorage.setItem(STORAGE_CREDS_KEY, JSON.stringify(creds));
     } catch (e) {
-      console.error("Failed to save sync creds", e);
+      console.error("Failed to save credentials", e);
     }
   },
 
   clearCredentials(): void {
-    localStorage.removeItem(SYNC_CREDS_KEY);
-    localStorage.removeItem(LAST_SYNC_TIME_KEY);
+    localStorage.removeItem(STORAGE_CREDS_KEY);
+    localStorage.removeItem(STORAGE_LAST_SYNC_KEY);
   },
 
   getLastSyncTime(): number | null {
-    const raw = localStorage.getItem(LAST_SYNC_TIME_KEY);
+    const raw = localStorage.getItem(STORAGE_LAST_SYNC_KEY);
     return raw ? parseInt(raw, 10) : null;
   },
 
   setLastSyncTime(ts: number): void {
-    localStorage.setItem(LAST_SYNC_TIME_KEY, ts.toString());
+    localStorage.setItem(STORAGE_LAST_SYNC_KEY, ts.toString());
   },
 
   // Prepare current local snapshot
@@ -77,7 +75,7 @@ export const SyncService = {
     };
   },
 
-  // Merge remote data with local data intelligently
+  // Merge remote data into local state intelligently
   mergeRemoteData(remote: SyncPayload): {
     mergedLastRead: LastRead | null;
     mergedStats: DailyReadingStats;
@@ -87,7 +85,7 @@ export const SyncService = {
     const localStats = TimerService.getStats();
     let hasChanges = false;
 
-    // 1. Merge Last Read (choose the one with more recent updatedAt)
+    // 1. Merge Last Read: whichever device read most recently wins
     let mergedLastRead = localLastRead;
     if (remote.lastRead) {
       if (
@@ -103,7 +101,6 @@ export const SyncService = {
     // 2. Merge Timer Stats
     let mergedStats = { ...localStats };
     if (remote.timerStats) {
-      // If same date, take maximums so progress is never lost
       if (remote.timerStats.date === localStats.date) {
         const higherSeconds = Math.max(
           localStats.secondsToday,
@@ -140,7 +137,6 @@ export const SyncService = {
           ? new Date(localStats.lastActiveDate).getTime()
           : 0)
       ) {
-        // Remote is newer date
         mergedStats = remote.timerStats;
         TimerService.saveStats(mergedStats);
         hasChanges = true;
@@ -150,54 +146,45 @@ export const SyncService = {
     return { mergedLastRead, mergedStats, hasChanges };
   },
 
-  // Connect or Verify Account
-  async connectAccount(
-    syncKey: string,
-    pin: string,
-    pushLocalDataOnNew: boolean = true,
+  // User Login (Existing Account)
+  async login(
+    username: string,
+    password: string,
   ): Promise<{
     ok: boolean;
-    isNew?: boolean;
     error?: string;
     payload?: SyncPayload;
   }> {
-    const cleanKey = syncKey.trim().toLowerCase();
-    const cleanPin = pin.trim();
+    const cleanUser = username.trim().toLowerCase();
+    const cleanPass = password.trim();
 
-    if (!cleanKey || cleanKey.length < 2) {
-      return { ok: false, error: "Sync Key অন্তত ২ অক্ষরের হতে হবে।" };
+    if (!cleanUser || cleanUser.length < 2) {
+      return { ok: false, error: "ইউজারনেম অন্তত ২ অক্ষরের হতে হবে।" };
     }
-    if (!cleanPin || cleanPin.length !== 4 || !/^\d{4}$/.test(cleanPin)) {
-      return {
-        ok: false,
-        error: "পিন অবশ্যই ৪ ডিজিটের সংখ্যা (যেমন: 1234) হতে হবে।",
-      };
+    if (!cleanPass || cleanPass.length < 3) {
+      return { ok: false, error: "পাসওয়ার্ড অন্তত ৩ অক্ষরের হতে হবে।" };
     }
 
     try {
-      const pinHash = await hashPin(cleanPin);
-      const localData = this.getLocalSnapshot();
-
+      const passwordHash = await hashPassword(cleanPass);
       const res = await fetch("/api/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "connect",
-          syncKey: cleanKey,
-          pinHash,
-          data: pushLocalDataOnNew ? localData : undefined,
+          action: "login",
+          username: cleanUser,
+          passwordHash,
         }),
       });
 
       const json = await res.json();
       if (!res.ok || !json.ok) {
-        return { ok: false, error: json.error || "সার্ভারে সংযোগ করা যায়নি।" };
+        return { ok: false, error: json.error || "লগইন করা যায়নি।" };
       }
 
-      // Save credentials locally
       this.setCredentials({
-        syncKey: cleanKey,
-        pin: cleanPin,
+        username: cleanUser,
+        passwordHash,
         lastSyncedAt: Date.now(),
       });
       this.setLastSyncTime(Date.now());
@@ -206,11 +193,69 @@ export const SyncService = {
         this.mergeRemoteData(json.data);
       }
 
-      return { ok: true, isNew: json.isNew, payload: json.data };
-    } catch (e) {
+      return { ok: true, payload: json.data };
+    } catch {
       return {
         ok: false,
-        error: "ইন্টারনেট কানেকশন চেক করুন বা আবার চেষ্টা করুন।",
+        error: "সার্ভারে কানেক্ট করা যায়নি। ইন্টারনেট কানেকশন চেক করুন।",
+      };
+    }
+  },
+
+  // User Registration (New Account)
+  async register(
+    username: string,
+    password: string,
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    payload?: SyncPayload;
+  }> {
+    const cleanUser = username.trim().toLowerCase();
+    const cleanPass = password.trim();
+
+    if (!cleanUser || cleanUser.length < 2) {
+      return { ok: false, error: "ইউজারনেম অন্তত ২ অক্ষরের হতে হবে।" };
+    }
+    if (!cleanPass || cleanPass.length < 3) {
+      return { ok: false, error: "পাসওয়ার্ড অন্তত ৩ অক্ষরের হতে হবে।" };
+    }
+
+    try {
+      const passwordHash = await hashPassword(cleanPass);
+      const localData = this.getLocalSnapshot();
+
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "register",
+          username: cleanUser,
+          passwordHash,
+          data: localData,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        return {
+          ok: false,
+          error: json.error || "অ্যাকাউন্ট তৈরি করা সম্ভব হয়নি।",
+        };
+      }
+
+      this.setCredentials({
+        username: cleanUser,
+        passwordHash,
+        lastSyncedAt: Date.now(),
+      });
+      this.setLastSyncTime(Date.now());
+
+      return { ok: true, payload: localData };
+    } catch {
+      return {
+        ok: false,
+        error: "সার্ভারে কানেক্ট করা যায়নি। ইন্টারনেট কানেকশন চেক করুন।",
       };
     }
   },
@@ -224,12 +269,11 @@ export const SyncService = {
     hasChanges?: boolean;
   }> {
     const creds = this.getCredentials();
-    if (!creds) return { ok: false, error: "নট কানেক্টেড" };
+    if (!creds) return { ok: false, error: "লগইন নেই" };
 
     try {
-      const pinHash = await hashPin(creds.pin);
       const res = await fetch(
-        `/api/sync?action=pull&key=${encodeURIComponent(creds.syncKey)}&pinHash=${encodeURIComponent(pinHash)}`,
+        `/api/sync?username=${encodeURIComponent(creds.username)}&passwordHash=${encodeURIComponent(creds.passwordHash)}`,
       );
 
       const json = await res.json();
@@ -245,27 +289,25 @@ export const SyncService = {
       }
 
       return { ok: true, hasChanges: false };
-    } catch (e) {
-      return { ok: false, error: "সিঙ্ক ফেইল হয়েছে" };
+    } catch {
+      return { ok: false, error: "সিঙ্ক করা যায়নি" };
     }
   },
 
-  // Push local updates to Cloudflare
+  // Push local updates to Cloudflare (runs automatically in background)
   async pushData(): Promise<{ ok: boolean; error?: string }> {
     const creds = this.getCredentials();
-    if (!creds) return { ok: false, error: "নট কানেক্টেড" };
+    if (!creds) return { ok: false, error: "লগইন নেই" };
 
     try {
-      const pinHash = await hashPin(creds.pin);
       const localData = this.getLocalSnapshot();
-
       const res = await fetch("/api/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "push",
-          syncKey: creds.syncKey,
-          pinHash,
+          username: creds.username,
+          passwordHash: creds.passwordHash,
           data: localData,
         }),
       });
@@ -277,8 +319,8 @@ export const SyncService = {
 
       this.setLastSyncTime(Date.now());
       return { ok: true };
-    } catch (e) {
-      return { ok: false, error: "ক্লাউডে পুশ করা যায়নি" };
+    } catch {
+      return { ok: false, error: "ক্লাউডে সেভ করা যায়নি" };
     }
   },
 };
