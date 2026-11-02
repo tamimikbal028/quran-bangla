@@ -109,9 +109,18 @@ function App() {
       }
     };
 
+    // Auto-sync pending data when internet comes back online
+    const handleOnline = () => {
+      if (SyncService.getCredentials()) {
+        SyncService.syncPending();
+      }
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("online", handleOnline);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("online", handleOnline);
     };
   }, []);
 
@@ -142,13 +151,10 @@ function App() {
         };
       });
 
-      // Persist to storage & cloud every 10 seconds
-      if (unsavedSecondsRef.current >= 10) {
+      // Persist to local storage every 5 seconds (NO network call)
+      if (unsavedSecondsRef.current >= 5) {
         TimerService.addSeconds(unsavedSecondsRef.current);
         unsavedSecondsRef.current = 0;
-        if (SyncService.getCredentials()) {
-          SyncService.pushData();
-        }
       }
     }, 1000);
 
@@ -157,6 +163,10 @@ function App() {
       if (unsavedSecondsRef.current > 0) {
         TimerService.addSeconds(unsavedSecondsRef.current);
         unsavedSecondsRef.current = 0;
+      }
+      // Sync to cloud ONLY when timer stops or reader is closed
+      if (SyncService.getCredentials()) {
+        SyncService.pushData();
       }
     };
   }, [selectedSurahId, isTimerRunning]);
@@ -171,6 +181,10 @@ function App() {
   const handleBackToList = () => {
     setSelectedSurahId(null);
     setTargetAyah(undefined);
+    if (unsavedSecondsRef.current > 0) {
+      TimerService.addSeconds(unsavedSecondsRef.current);
+      unsavedSecondsRef.current = 0;
+    }
     setLastRead(QuranService.getLastRead());
     setTimerStats(TimerService.getStats());
     if (isSyncConnected) {
@@ -207,7 +221,22 @@ function App() {
         onBackToList={handleBackToList}
         timerStats={timerStats}
         isTimerRunning={isTimerRunning}
-        onToggleTimer={() => setIsTimerRunning((r) => !r)}
+        onToggleTimer={() => {
+          setIsTimerRunning((r) => {
+            const next = !r;
+            // When timer is paused/turned off, save seconds and push to cloud
+            if (!next) {
+              if (unsavedSecondsRef.current > 0) {
+                TimerService.addSeconds(unsavedSecondsRef.current);
+                unsavedSecondsRef.current = 0;
+              }
+              if (SyncService.getCredentials()) {
+                SyncService.pushData();
+              }
+            }
+            return next;
+          });
+        }}
         onOpenGoalModal={() => setIsGoalModalOpen(true)}
         isSyncConnected={isSyncConnected}
         loggedInUsername={loggedInUsername}

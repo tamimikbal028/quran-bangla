@@ -294,6 +294,10 @@ export const SyncService = {
     }
   },
 
+  hasPendingSync(): boolean {
+    return localStorage.getItem("quran_bn_pending_sync") === "true";
+  },
+
   // Push local updates to Cloudflare (runs automatically in background)
   async pushData(): Promise<{ ok: boolean; error?: string }> {
     const creds = this.getCredentials();
@@ -314,13 +318,27 @@ export const SyncService = {
 
       const json = await res.json();
       if (!res.ok || !json.ok) {
+        localStorage.setItem("quran_bn_pending_sync", "true");
         return { ok: false, error: json.error || "ডাটা সেভ করা যায়নি" };
       }
 
+      localStorage.removeItem("quran_bn_pending_sync");
       this.setLastSyncTime(Date.now());
       return { ok: true };
     } catch {
-      return { ok: false, error: "ক্লাউডে সেভ করা যায়নি" };
+      // Offline / Network error: mark as pending so it syncs automatically when online
+      localStorage.setItem("quran_bn_pending_sync", "true");
+      return { ok: false, error: "অফলাইন আছেন। নেটওয়ার্ক আসলে অটো-সিঙ্ক হবে।" };
+    }
+  },
+
+  // Sync pending changes when back online
+  async syncPending(): Promise<void> {
+    if (this.hasPendingSync() && this.getCredentials()) {
+      const pushRes = await this.pushData();
+      if (pushRes.ok) {
+        await this.pullData();
+      }
     }
   },
 };
