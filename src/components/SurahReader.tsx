@@ -360,66 +360,71 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
       </div>
 
       {/* Mobile-Optimized Reader Controls Bar */}
-      <div className="sticky top-16 z-30 p-2 sm:p-3 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-xs space-y-2">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
+      <div className="sticky top-16 z-30 p-1.5 sm:p-2.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-xs space-y-1.5">
+        <div className="flex items-center justify-between gap-1 sm:gap-2">
           {/* 3 Reading Modes: আয়াত / রুকু / বই */}
-          <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-xl">
+          <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 bg-slate-100 rounded-xl shrink-0">
             <button
               onClick={() => setReadingMode("cards")}
-              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
                 readingMode === "cards"
                   ? "bg-white text-emerald-800 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
               title="আয়াতভিত্তিক কার্ড মোড"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span className="text-[11px] sm:text-xs">আয়াত</span>
+              <LayoutGrid className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span>আয়াত</span>
             </button>
 
             <button
               onClick={() => setReadingMode("ruku")}
-              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
                 readingMode === "ruku"
                   ? "bg-white text-emerald-800 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
               title="রুকুভিত্তিক পাঠ মোড"
             >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span className="text-[11px] sm:text-xs">রুকু</span>
+              <BookOpen className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span>রুকু</span>
             </button>
 
             <button
               onClick={() => setReadingMode("continuous")}
-              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
                 readingMode === "continuous"
                   ? "bg-white text-emerald-800 shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
               title="ধারাবাহিক বই মোড"
             >
-              <AlignLeft className="w-3.5 h-3.5" />
-              <span className="text-[11px] sm:text-xs">বই</span>
+              <AlignLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span>বই</span>
             </button>
           </div>
 
           {/* Right Action: Font Sizes & Search Toggle */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {/* Font Size Pills */}
             <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-xl">
               {(["sm", "base", "lg", "xl"] as FontSize[]).map((size) => (
                 <button
                   key={size}
                   onClick={() => setFontSize(size)}
-                  className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold transition-colors cursor-pointer ${
                     fontSize === size
                       ? "bg-emerald-600 text-white shadow-2xs"
                       : "text-slate-600 hover:bg-slate-200"
                   }`}
                 >
                   {size === "sm" && "ছোট"}
-                  {size === "base" && "স্বাভাবিক"}
+                  {size === "base" && (
+                    <>
+                      <span className="hidden sm:inline">স্বাভাবিক</span>
+                      <span className="sm:hidden">মাঝারি</span>
+                    </>
+                  )}
                   {size === "lg" && "বড়"}
                   {size === "xl" && "বিশাল"}
                 </button>
@@ -429,7 +434,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
             {/* In-Surah Search Toggle Button */}
             <button
               onClick={() => setIsSearchOpen((prev) => !prev)}
-              className={`p-2 rounded-xl transition-colors cursor-pointer ${
+              className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-colors cursor-pointer ${
                 isSearchOpen || inSurahQuery
                   ? "bg-emerald-100 text-emerald-800"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -437,7 +442,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
               title="এই সূরায় খুঁজুন"
               aria-label="এই সূরায় খুঁজুন"
             >
-              <Search className="w-4 h-4" />
+              <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </div>
         </div>
