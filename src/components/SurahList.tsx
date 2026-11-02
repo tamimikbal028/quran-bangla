@@ -1,23 +1,47 @@
 import React, { useState, useMemo } from "react";
 import type { SurahMeta, LastRead } from "../types/quran";
-import { toBengaliNumber, getRevelationTypeBengali } from "../utils/bengali";
-import { Search, BookOpen, Sparkles, ArrowRight } from "lucide-react";
+import type { DailyReadingStats } from "../services/timerService";
+import {
+  toBengaliNumber,
+  getRevelationTypeBengali,
+  formatTimeMMSS,
+} from "../utils/bengali";
+import {
+  Search,
+  BookOpen,
+  ArrowRight,
+  Clock,
+  Flame,
+  CheckCircle2,
+  Sliders,
+} from "lucide-react";
 
 interface SurahListProps {
   surahs: SurahMeta[];
   onSelectSurah: (id: number, targetAyah?: number) => void;
   lastRead: LastRead | null;
+  timerStats: DailyReadingStats;
+  onOpenGoalModal: () => void;
 }
 
 export const SurahList: React.FC<SurahListProps> = ({
   surahs,
   onSelectSurah,
   lastRead,
+  timerStats,
+  onOpenGoalModal,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "meccan" | "medinan">(
     "all",
   );
+
+  const targetSeconds = timerStats.targetMinutes * 60;
+  const progressPercent = Math.min(
+    100,
+    Math.round((timerStats.secondsToday / targetSeconds) * 100),
+  );
+  const isGoalReached = timerStats.secondsToday >= targetSeconds;
 
   const filteredSurahs = useMemo(() => {
     return surahs.filter((surah) => {
@@ -48,50 +72,151 @@ export const SurahList: React.FC<SurahListProps> = ({
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 max-w-2xl space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/15 text-emerald-100 border border-white/20">
-            <Sparkles className="w-3.5 h-3.5" />
-            বিশুদ্ধ ও সহজ বাংলা অনুবাদ
+            <Clock className="w-3.5 h-3.5" />
+            প্রতিদিনের লক্ষ্য: {toBengaliNumber(timerStats.targetMinutes)} মিনিট
           </div>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white leading-snug">
             পবিত্র কুরআনের বিশুদ্ধ বাংলা ভাবার্থ
           </h1>
           <p className="text-emerald-100/90 text-sm sm:text-base leading-relaxed">
-            কোনো জটিলতা ছাড়া কেবল বাংলা ভাষায় কুরআনের বাণী অনুধাবন ও অধ্যয়নের
-            জন্য তৈরি বিশেষ প্ল্যাটফর্ম।
+            সহজ বাংলা ভাষায় প্রতিদিন অন্তত ২০ মিনিট কুরআনের ভাবার্থ পাঠ ও অনুধাবনের প্ল্যাটফর্ম।
           </p>
         </div>
       </div>
 
-      {/* Continue Reading Card (if available) */}
-      {lastRead && (
-        <div className="p-5 rounded-2xl bg-white border border-emerald-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-emerald-400">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-100/70 text-emerald-800 flex items-center justify-center shrink-0">
-              <BookOpen className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider block">
-                সর্বশেষ পঠিত
+      {/* Daily Goal & Continue Reading Dual Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Daily Reading Tracker Card */}
+        <div className="p-5 rounded-2xl bg-white border border-emerald-200/90 shadow-xs flex flex-col justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider inline-flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-emerald-700" />
+                আজকের পড়ার লক্ষ্য
               </span>
-              <h3 className="text-base sm:text-lg font-bold text-slate-900">
-                {lastRead.surahName} • আয়াত{" "}
-                {toBengaliNumber(lastRead.ayahNumber)}
-              </h3>
-              <p className="text-xs text-slate-500">
-                যেখান থেকে পড়া থামিয়েছিলেন সেখান থেকে পড়া শুরু করুন
-              </p>
+              <button
+                onClick={onOpenGoalModal}
+                className="text-xs text-slate-400 hover:text-emerald-700 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                title="লক্ষ্য পরিবর্তন"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>পরিবর্তন</span>
+              </button>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-sans">
+                  {formatTimeMMSS(timerStats.secondsToday)}
+                </span>
+                <span className="text-xs text-slate-400 ml-1.5">
+                  / {toBengaliNumber(timerStats.targetMinutes)} মিনিট
+                </span>
+              </div>
+
+              {timerStats.streakDays > 0 && (
+                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200/80">
+                  <Flame className="w-3.5 h-3.5 fill-amber-500" />
+                  <span>
+                    {toBengaliNumber(timerStats.streakDays)} দিন স্ট্রিক
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden p-0.5 mt-2">
+              <div
+                className="h-full bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
             </div>
           </div>
-          <button
-            onClick={() =>
-              onSelectSurah(lastRead.surahNumber, lastRead.ayahNumber)
-            }
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm transition-all shadow-sm shadow-emerald-700/20 active:scale-95 cursor-pointer shrink-0"
-          >
-            <span>পড়া চালিয়ে যান</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+
+          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+            <span className="text-slate-500">
+              {isGoalReached ? (
+                <span className="text-emerald-700 font-bold inline-flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> আজকের লক্ষ্য সম্পন্ন
+                  হয়েছে!
+                </span>
+              ) : (
+                <span>{toBengaliNumber(progressPercent)}% সম্পন্ন হয়েছে</span>
+              )}
+            </span>
+
+            <button
+              onClick={onOpenGoalModal}
+              className="text-emerald-700 hover:text-emerald-800 font-semibold cursor-pointer"
+            >
+              বিস্তারিত দেখুন →
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Continue Reading Card */}
+        {lastRead ? (
+          <div className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex flex-col justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-100/70 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                  সর্বশেষ যেখান থেকে পড়া হয়েছিল
+                </span>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate mt-0.5">
+                  {lastRead.surahName} • আয়াত{" "}
+                  {toBengaliNumber(lastRead.ayahNumber)}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  ক্লিক করলেই সেখানে গিয়ে টাইমারসহ পড়া চালু হবে
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+              <button
+                onClick={() =>
+                  onSelectSurah(lastRead.surahNumber, lastRead.ayahNumber)
+                }
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <span>পড়া চালিয়ে যান</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex flex-col justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-100/70 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                  পড়া শুরু করুন
+                </span>
+                <h3 className="text-base font-bold text-slate-900 mt-0.5">
+                  সূরা ১. আল-ফাতিহা
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  প্রথম সূরা দিয়ে আপনার আজকের পাঠ শুরু করুন
+                </p>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+              <button
+                onClick={() => onSelectSurah(1)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <span>শুরু করুন</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Search & Tabs Controls */}
       <div className="space-y-4">
@@ -108,7 +233,7 @@ export const SurahList: React.FC<SurahListProps> = ({
           {searchTerm && (
             <button
               onClick={() => setSearchTerm("")}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded-lg"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded-lg cursor-pointer"
             >
               মুছে ফেলুন
             </button>

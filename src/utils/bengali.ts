@@ -14,3 +14,25 @@ export function getRevelationTypeBengali(type: string): string {
   }
   return "মাদানী";
 }
+
+export function formatTimeMMSS(totalSeconds: number): string {
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  const mm = mins.toString().padStart(2, "0");
+  const ss = secs.toString().padStart(2, "0");
+  return `${toBengaliNumber(mm)}:${toBengaliNumber(ss)}`;
+}
+
+export function formatTimeBengaliFriendly(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${toBengaliNumber(hours)} ঘণ্টা ${toBengaliNumber(mins)} মিনিট`;
+  }
+  if (mins > 0) {
+    return `${toBengaliNumber(mins)} মিনিট ${secs > 0 ? `${toBengaliNumber(secs)} সেকেন্ড` : ""}`.trim();
+  }
+  return `${toBengaliNumber(secs)} সেকেন্ড`;
+}
