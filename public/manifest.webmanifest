@@ -1,0 +1,32 @@
+{
+  "name": "আল-কুরআন - বাংলা অনুবাদ",
+  "short_name": "আল-কুরআন",
+  "description": "পবিত্র কুরআনের সহজ ও প্রাঞ্জল বাংলা অনুবাদ, রুকুভিত্তিক পাঠ ও পড়ার সময় ট্র্যাকার",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#047857",
+  "categories": ["books", "education", "lifestyle"],
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "48x48 96x96 192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

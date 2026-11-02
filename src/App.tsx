@@ -26,6 +26,45 @@ function App() {
 
   const unsavedSecondsRef = useRef<number>(0);
 
+  // PWA Install Prompt State
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState<boolean>(false);
+  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setIsInstalled(true);
+    }
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    window.addEventListener("appinstalled", () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+    });
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!installPrompt) return;
+    try {
+      installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      if (choice.outcome === "accepted") {
+        setInstallPrompt(null);
+      }
+    } catch (err) {
+      console.log("Install prompt error:", err);
+    }
+  };
+
   // Initialize
   useEffect(() => {
     const list = QuranService.getAllSurahs();
@@ -123,6 +162,36 @@ function App() {
         onToggleTimer={() => setIsTimerRunning((r) => !r)}
         onOpenGoalModal={() => setIsGoalModalOpen(true)}
       />
+
+      {/* PWA Offline Install Banner */}
+      {installPrompt &&
+        showInstallBanner &&
+        !isInstalled &&
+        !selectedSurahId && (
+          <div className="bg-gradient-to-r from-emerald-800 to-teal-800 text-white px-4 py-2.5 text-xs sm:text-sm flex items-center justify-between gap-3 shadow-inner">
+            <div className="flex items-center gap-2 truncate">
+              <span className="text-base shrink-0">📱</span>
+              <span className="truncate">
+                ইন্টারনেট ছাড়াই প্রতিদিন পড়তে অ্যাপটি মোবাইলে ইনস্টল করুন
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleInstallApp}
+                className="px-3 py-1 bg-white text-emerald-900 font-bold rounded-lg hover:bg-emerald-50 active:scale-95 transition-all text-xs cursor-pointer shadow-xs"
+              >
+                ইনস্টল করুন
+              </button>
+              <button
+                onClick={() => setShowInstallBanner(false)}
+                className="text-emerald-300 hover:text-white p-1 text-sm cursor-pointer"
+                title="লুকান"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
       {/* Main Content Area */}
       <main className="flex-1">
