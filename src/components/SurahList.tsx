@@ -79,7 +79,8 @@ export const SurahList: React.FC<SurahListProps> = ({
             পবিত্র কুরআনের বিশুদ্ধ বাংলা ভাবার্থ
           </h1>
           <p className="text-emerald-100/90 text-sm sm:text-base leading-relaxed">
-            সহজ বাংলা ভাষায় প্রতিদিন অন্তত ২০ মিনিট কুরআনের ভাবার্থ পাঠ ও অনুধাবনের প্ল্যাটফর্ম।
+            সহজ বাংলা ভাষায় প্রতিদিন অন্তত ২০ মিনিট কুরআনের ভাবার্থ পাঠ ও
+            অনুধাবনের প্ল্যাটফর্ম।
           </p>
         </div>
       </div>
@@ -158,9 +159,6 @@ export const SurahList: React.FC<SurahListProps> = ({
         {lastRead ? (
           <div className="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex flex-col justify-between gap-4">
             <div className="flex items-start gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-emerald-100/70 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
-                <BookOpen className="w-5 h-5" />
-              </div>
               <div className="min-w-0">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                   সর্বশেষ যেখান থেকে পড়া হয়েছিল
@@ -244,31 +242,31 @@ export const SurahList: React.FC<SurahListProps> = ({
         <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
           <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/60 overflow-x-auto no-scrollbar max-w-full">
             <button
-              onClick={() => setActiveTab('all')}
+              onClick={() => setActiveTab("all")}
               className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === 'all'
-                  ? 'bg-white text-emerald-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                activeTab === "all"
+                  ? "bg-white text-emerald-800 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               সকল সূরা ({toBengaliNumber(114)})
             </button>
             <button
-              onClick={() => setActiveTab('meccan')}
+              onClick={() => setActiveTab("meccan")}
               className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === 'meccan'
-                  ? 'bg-white text-emerald-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                activeTab === "meccan"
+                  ? "bg-white text-emerald-800 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               মাক্কী ({toBengaliNumber(86)})
             </button>
             <button
-              onClick={() => setActiveTab('medinan')}
+              onClick={() => setActiveTab("medinan")}
               className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === 'medinan'
-                  ? 'bg-white text-emerald-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                activeTab === "medinan"
+                  ? "bg-white text-emerald-800 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               মাদানী ({toBengaliNumber(28)})

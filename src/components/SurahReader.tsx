@@ -1,7 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import type { SurahDetail, SurahMeta, ReadingMode, FontSize } from '../types/quran';
-import { QuranService } from '../services/quranService';
-import { toBengaliNumber, getRevelationTypeBengali } from '../utils/bengali';
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import type {
+  SurahDetail,
+  SurahMeta,
+  ReadingMode,
+  FontSize,
+  LastRead,
+} from "../types/quran";
+import { QuranService } from "../services/quranService";
+import { toBengaliNumber, getRevelationTypeBengali } from "../utils/bengali";
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,7 +18,9 @@ import {
   AlignLeft,
   ArrowUp,
   X,
-} from 'lucide-react';
+  CheckCircle2,
+  BookmarkCheck,
+} from "lucide-react";
 
 interface SurahReaderProps {
   surahId: number;
@@ -20,6 +28,7 @@ interface SurahReaderProps {
   targetAyah?: number;
   onSelectSurah: (id: number) => void;
   onBackToList: () => void;
+  onLastReadUpdated?: (lastRead: LastRead) => void;
 }
 
 export const SurahReader: React.FC<SurahReaderProps> = ({
@@ -28,16 +37,20 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
   targetAyah,
   onSelectSurah,
   onBackToList,
+  onLastReadUpdated,
 }) => {
   const [surahDetail, setSurahDetail] = useState<SurahDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [readingMode, setReadingMode] = useState<ReadingMode>('cards');
-  const [fontSize, setFontSize] = useState<FontSize>('lg');
-  const [inSurahQuery, setInSurahQuery] = useState('');
+  const [readingMode, setReadingMode] = useState<ReadingMode>("cards");
+  const [fontSize, setFontSize] = useState<FontSize>("lg");
+  const [inSurahQuery, setInSurahQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [copiedAyah, setCopiedAyah] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [currentLastRead, setCurrentLastRead] = useState<LastRead | null>(() =>
+    QuranService.getLastRead(),
+  );
 
   const ayahRefs = useRef<{ [key: number]: HTMLElement | null }>({});
 
@@ -46,7 +59,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
-    }, 2000);
+    }, 2500);
   };
 
   // Track scroll position for floating back-to-top button
@@ -58,11 +71,11 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
         setShowScrollTop(false);
       }
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Load Surah detail
+  // Load Surah detail (DO NOT AUTO-OVERWRITE LAST READ)
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
@@ -72,44 +85,53 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
         if (isMounted && detail) {
           setSurahDetail(detail);
           setLoading(false);
-
-          // Update Last Read
-          QuranService.setLastRead({
-            surahNumber: surahId,
-            surahName: surahMeta.banglaName,
-            ayahNumber: targetAyah || 1,
-            updatedAt: Date.now(),
-          });
         }
       })
       .catch((err) => {
-        console.error('Failed to load surah:', err);
+        console.error("Failed to load surah:", err);
         if (isMounted) setLoading(false);
       });
 
     return () => {
       isMounted = false;
     };
-  }, [surahId, surahMeta.banglaName, targetAyah]);
+  }, [surahId]);
 
-  // Scroll to target ayah if provided
+  // Scroll to target ayah if provided (e.g. from Home's "পড়া চালিয়ে যান")
   useEffect(() => {
     if (!loading && targetAyah && ayahRefs.current[targetAyah]) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         ayahRefs.current[targetAyah]?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
+          behavior: "smooth",
+          block: "center",
         });
-      }, 300);
+      }, 350);
+      return () => clearTimeout(timer);
     }
   }, [loading, targetAyah]);
+
+  // Manual Last Read Bookmark (user clicks the ayah or button)
+  const handleSetLastRead = (ayahNumber: number) => {
+    const updated: LastRead = {
+      surahNumber: surahId,
+      surahName: surahMeta.banglaName,
+      ayahNumber,
+      updatedAt: Date.now(),
+    };
+    QuranService.setLastRead(updated);
+    setCurrentLastRead(updated);
+    onLastReadUpdated?.(updated);
+    showToast(
+      `পড়ার স্থান চিহ্নিত: ${surahMeta.banglaName}, আয়াত ${toBengaliNumber(ayahNumber)}`,
+    );
+  };
 
   // Handle Copy Ayah
   const handleCopyAyah = (ayahNumber: number, text: string) => {
     const copyString = `${surahMeta.banglaName}, আয়াত ${toBengaliNumber(ayahNumber)}:\n${text}`;
     navigator.clipboard.writeText(copyString).then(() => {
       setCopiedAyah(ayahNumber);
-      showToast('আয়াত সফলভাবে কপি করা হয়েছে');
+      showToast("আয়াত সফলভাবে কপি করা হয়েছে");
       setTimeout(() => setCopiedAyah(null), 2000);
     });
   };
@@ -117,18 +139,18 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
   // Font size classes optimized for mobile & desktop
   const fontClass = useMemo(() => {
     switch (fontSize) {
-      case 'sm':
-        return 'text-base sm:text-lg leading-relaxed';
-      case 'base':
-        return 'text-lg sm:text-xl leading-relaxed sm:leading-loose';
-      case 'lg':
-        return 'text-xl sm:text-2xl leading-relaxed sm:leading-loose';
-      case 'xl':
-        return 'text-2xl sm:text-3xl leading-relaxed sm:leading-loose';
-      case '2xl':
-        return 'text-2xl sm:text-4xl leading-loose';
+      case "sm":
+        return "text-base sm:text-lg leading-relaxed";
+      case "base":
+        return "text-lg sm:text-xl leading-relaxed sm:leading-loose";
+      case "lg":
+        return "text-xl sm:text-2xl leading-relaxed sm:leading-loose";
+      case "xl":
+        return "text-2xl sm:text-3xl leading-relaxed sm:leading-loose";
+      case "2xl":
+        return "text-2xl sm:text-4xl leading-loose";
       default:
-        return 'text-xl sm:text-2xl leading-relaxed sm:leading-loose';
+        return "text-xl sm:text-2xl leading-relaxed sm:leading-loose";
     }
   }, [fontSize]);
 
@@ -141,12 +163,12 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
       (a) =>
         a.text.toLowerCase().includes(q) ||
         a.numberInSurah.toString() === q ||
-        toBengaliNumber(a.numberInSurah) === q
+        toBengaliNumber(a.numberInSurah) === q,
     );
   }, [surahDetail, inSurahQuery]);
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   if (loading) {
@@ -208,7 +230,9 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
             onClick={() => onSelectSurah(surahId - 1)}
             disabled={surahId <= 1}
             className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors ${
-              surahId <= 1 ? 'opacity-30 pointer-events-none' : 'cursor-pointer active:scale-95'
+              surahId <= 1
+                ? "opacity-30 pointer-events-none"
+                : "cursor-pointer active:scale-95"
             }`}
           >
             <ChevronLeft className="w-4 h-4 shrink-0" />
@@ -223,7 +247,9 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
             onClick={() => onSelectSurah(surahId + 1)}
             disabled={surahId >= 114}
             className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors ${
-              surahId >= 114 ? 'opacity-30 pointer-events-none' : 'cursor-pointer active:scale-95'
+              surahId >= 114
+                ? "opacity-30 pointer-events-none"
+                : "cursor-pointer active:scale-95"
             }`}
           >
             <span className="truncate">পরবর্তী</span>
@@ -256,11 +282,11 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
           {/* Reading Mode Switcher */}
           <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-xl">
             <button
-              onClick={() => setReadingMode('cards')}
+              onClick={() => setReadingMode("cards")}
               className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                readingMode === 'cards'
-                  ? 'bg-white text-emerald-800 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                readingMode === "cards"
+                  ? "bg-white text-emerald-800 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
               title="আয়াতভিত্তিক কার্ড মোড"
             >
@@ -268,11 +294,11 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
               <span className="text-[11px] sm:text-xs">আয়াত</span>
             </button>
             <button
-              onClick={() => setReadingMode('continuous')}
+              onClick={() => setReadingMode("continuous")}
               className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                readingMode === 'continuous'
-                  ? 'bg-white text-emerald-800 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                readingMode === "continuous"
+                  ? "bg-white text-emerald-800 shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
               title="ধারাবাহিক বই মোড"
             >
@@ -285,20 +311,20 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
           <div className="flex items-center gap-1.5">
             {/* Font Size Pills */}
             <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-xl">
-              {(['sm', 'base', 'lg', 'xl'] as FontSize[]).map((size) => (
+              {(["sm", "base", "lg", "xl"] as FontSize[]).map((size) => (
                 <button
                   key={size}
                   onClick={() => setFontSize(size)}
                   className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer ${
                     fontSize === size
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:bg-slate-200'
+                      ? "bg-emerald-600 text-white shadow-2xs"
+                      : "text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  {size === 'sm' && 'ছোট'}
-                  {size === 'base' && 'স্বাভাবিক'}
-                  {size === 'lg' && 'বড়'}
-                  {size === 'xl' && 'বিশাল'}
+                  {size === "sm" && "ছোট"}
+                  {size === "base" && "স্বাভাবিক"}
+                  {size === "lg" && "বড়"}
+                  {size === "xl" && "বিশাল"}
                 </button>
               ))}
             </div>
@@ -308,8 +334,8 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
               onClick={() => setIsSearchOpen((prev) => !prev)}
               className={`p-2 rounded-xl transition-colors cursor-pointer ${
                 isSearchOpen || inSurahQuery
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
               title="এই সূরায় খুঁজুন"
               aria-label="এই সূরায় খুঁজুন"
@@ -333,7 +359,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
             />
             {inSurahQuery ? (
               <button
-                onClick={() => setInSurahQuery('')}
+                onClick={() => setInSurahQuery("")}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700 cursor-pointer p-1"
               >
                 ✕
@@ -359,14 +385,26 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
         </div>
       )}
 
+      {/* Helpful Hint */}
+      <div className="px-3.5 py-2 rounded-xl bg-slate-100/90 text-slate-600 text-xs flex items-center justify-between border border-slate-200/80">
+        <span className="inline-flex items-center gap-1.5">
+          <BookmarkCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <span>
+            যে আয়াতে পড়া থামাবেন, সেটিতে ক্লিক করলেই পড়ার অবস্থান সেভ হয়ে
+            থাকবে।
+          </span>
+        </span>
+      </div>
+
       {/* Search results notice */}
       {inSurahQuery && (
         <div className="px-3.5 py-2 rounded-xl bg-amber-50 text-amber-800 text-xs flex items-center justify-between border border-amber-200">
           <span>
-            খুঁজে পাওয়া গেছে: <strong>{toBengaliNumber(filteredAyahs.length)}</strong> টি আয়াত
+            খুঁজে পাওয়া গেছে:{" "}
+            <strong>{toBengaliNumber(filteredAyahs.length)}</strong> টি আয়াত
           </span>
           <button
-            onClick={() => setInSurahQuery('')}
+            onClick={() => setInSurahQuery("")}
             className="underline text-amber-900 font-medium cursor-pointer"
           >
             ফিল্টার সরান
@@ -375,11 +413,15 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
       )}
 
       {/* MAIN CONTENT BASED ON READING MODE */}
-      {readingMode === 'cards' ? (
-        /* Ayah-by-Ayah Cards Mode (Mobile Optimized) */
+      {readingMode === "cards" ? (
+        /* Ayah-by-Ayah Cards Mode */
         <div className="space-y-3 sm:space-y-4">
           {filteredAyahs.map((ayah) => {
             const isCopied = copiedAyah === ayah.numberInSurah;
+            const isThisMarked =
+              currentLastRead?.surahNumber === surahId &&
+              currentLastRead?.ayahNumber === ayah.numberInSurah;
+            const isTargetHighlight = targetAyah === ayah.numberInSurah;
 
             return (
               <div
@@ -387,16 +429,24 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                 ref={(el) => {
                   ayahRefs.current[ayah.numberInSurah] = el;
                 }}
-                className={`p-4 sm:p-6 rounded-2xl bg-white border transition-all duration-200 shadow-2xs space-y-3 sm:space-y-4 ${
-                  targetAyah === ayah.numberInSurah
-                    ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/15'
-                    : 'border-slate-200/90'
+                className={`p-4 sm:p-6 rounded-2xl bg-white border transition-all duration-300 shadow-2xs space-y-3 sm:space-y-4 ${
+                  isThisMarked
+                    ? "border-emerald-600 ring-2 ring-emerald-500/30 bg-emerald-50/25"
+                    : isTargetHighlight
+                      ? "border-emerald-400 ring-2 ring-emerald-400/20 bg-emerald-50/10"
+                      : "border-slate-200/90 hover:border-slate-300"
                 }`}
               >
                 {/* Ayah Top Bar */}
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center shrink-0">
+                    <span
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 transition-colors ${
+                        isThisMarked
+                          ? "bg-emerald-600 text-white"
+                          : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
                       {toBengaliNumber(ayah.numberInSurah)}
                     </span>
                     <span className="text-[11px] sm:text-xs text-slate-400">
@@ -404,34 +454,65 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                     </span>
                   </div>
 
-                  {/* Copy Button */}
-                  <button
-                    onClick={() => handleCopyAyah(ayah.numberInSurah, ayah.text)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer active:scale-95 ${
-                      isCopied
-                        ? 'bg-emerald-50 text-emerald-700 font-medium'
-                        : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                    }`}
-                    title="আয়াত কপি করুন"
-                    aria-label="আয়াত কপি করুন"
-                  >
-                    {isCopied ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-[11px] text-emerald-700">কপি হয়েছে</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span className="text-[11px] hidden xs:inline">কপি</span>
-                      </>
-                    )}
-                  </button>
+                  {/* Actions: Copy & Mark as Last Read */}
+                  <div className="flex items-center gap-1.5">
+                    {/* Mark as Last Read Button */}
+                    <button
+                      onClick={() => handleSetLastRead(ayah.numberInSurah)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer active:scale-95 ${
+                        isThisMarked
+                          ? "bg-emerald-600 text-white shadow-2xs"
+                          : "bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-500"
+                      }`}
+                      title={
+                        isThisMarked
+                          ? "পড়ার সর্বশেষ অবস্থান হিসেবে চিহ্নিত"
+                          : "পড়া এখানে শেষ চিহ্নিত করুন"
+                      }
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span className="text-[11px] sm:text-xs">
+                        {isThisMarked ? "এখানে পড়া শেষ" : "চিহ্নিত করুন"}
+                      </span>
+                    </button>
+
+                    {/* Copy Button */}
+                    <button
+                      onClick={() =>
+                        handleCopyAyah(ayah.numberInSurah, ayah.text)
+                      }
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer active:scale-95 ${
+                        isCopied
+                          ? "bg-emerald-50 text-emerald-700 font-medium"
+                          : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                      }`}
+                      title="আয়াত কপি করুন"
+                      aria-label="আয়াত কপি করুন"
+                    >
+                      {isCopied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-[11px] text-emerald-700">
+                            কপি হয়েছে
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span className="text-[11px] hidden xs:inline">
+                            কপি
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                {/* Pure Bengali Ayah Text */}
+                {/* Pure Bengali Ayah Text - clicking also marks as last read */}
                 <p
-                  className={`text-slate-800 font-sans ${fontClass} select-text tracking-normal break-words`}
+                  onClick={() => handleSetLastRead(ayah.numberInSurah)}
+                  className={`text-slate-800 font-sans ${fontClass} select-text tracking-normal break-words cursor-pointer hover:text-slate-950 transition-colors`}
+                  title="ক্লিক করে এই আয়াত পর্যন্ত পড়ার অবস্থান সেভ করুন"
                 >
                   {ayah.text}
                 </p>
@@ -442,30 +523,48 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
       ) : (
         /* Continuous Flow Mode (Book Mode) */
         <div className="p-4 sm:p-10 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4 sm:space-y-6">
-          <div className={`text-slate-800 font-sans ${fontClass} leading-relaxed sm:leading-loose text-justify break-words`}>
+          <div
+            className={`text-slate-800 font-sans ${fontClass} leading-relaxed sm:leading-loose text-justify break-words`}
+          >
             {filteredAyahs.map((ayah) => {
+              const isThisMarked =
+                currentLastRead?.surahNumber === surahId &&
+                currentLastRead?.ayahNumber === ayah.numberInSurah;
+
               return (
                 <span
                   key={ayah.numberInSurah}
                   ref={(el) => {
                     ayahRefs.current[ayah.numberInSurah] = el;
                   }}
-                  className="inline"
+                  onClick={() => handleSetLastRead(ayah.numberInSurah)}
+                  className={`inline cursor-pointer transition-colors rounded px-0.5 ${
+                    isThisMarked
+                      ? "bg-emerald-100/70 text-slate-900 font-medium"
+                      : "hover:bg-emerald-50/60"
+                  }`}
+                  title={`আয়াত ${toBengaliNumber(ayah.numberInSurah)} - ক্লিক করে পড়ার অবস্থান চিহ্নিত করুন`}
                 >
                   <span>{ayah.text} </span>
                   <span
-                    className="inline-flex items-center justify-center min-w-[22px] h-[22px] sm:min-w-[24px] sm:h-[24px] px-1 sm:px-1.5 rounded-full text-[11px] sm:text-[12px] font-bold mx-0.5 sm:mx-1 align-baseline bg-emerald-100 text-emerald-900 shrink-0"
-                    title={`আয়াত ${toBengaliNumber(ayah.numberInSurah)}`}
+                    className={`inline-flex items-center justify-center min-w-[22px] h-[22px] sm:min-w-[24px] sm:h-[24px] px-1 sm:px-1.5 rounded-full text-[11px] sm:text-[12px] font-bold mx-0.5 sm:mx-1 align-baseline transition-all shrink-0 ${
+                      isThisMarked
+                        ? "bg-emerald-600 text-white ring-2 ring-emerald-400 shadow-xs scale-105"
+                        : "bg-emerald-100 text-emerald-900"
+                    }`}
                   >
-                    {toBengaliNumber(ayah.numberInSurah)}
-                  </span>{' '}
+                    {isThisMarked
+                      ? `✓${toBengaliNumber(ayah.numberInSurah)}`
+                      : toBengaliNumber(ayah.numberInSurah)}
+                  </span>{" "}
                 </span>
               );
             })}
           </div>
 
           <div className="pt-3 border-t border-slate-100 text-center text-[11px] sm:text-xs text-slate-400">
-            ধারাবাহিক পাঠ মোড • পুরো সূরার অর্থ একটানা পড়ার জন্য।
+            ধারাবাহিক পাঠ মোড • যেকোনো আয়াতে ক্লিক করে পড়ার শেষ অবস্থান চিহ্নিত
+            করা যাবে।
           </div>
         </div>
       )}

@@ -133,6 +133,7 @@ function App() {
             targetAyah={targetAyah}
             onSelectSurah={(id) => handleSelectSurah(id)}
             onBackToList={handleBackToList}
+            onLastReadUpdated={(lr) => setLastRead(lr)}
           />
         ) : (
           <SurahList
