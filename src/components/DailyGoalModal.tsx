@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import type { DailyReadingStats } from "../services/timerService";
 import { TimerService } from "../services/timerService";
 import {
@@ -6,13 +6,22 @@ import {
   formatTimeBengaliFriendly,
   formatTimeMMSS,
 } from "../utils/bengali";
-import { X, Flame, Clock, Award, Target, RotateCcw } from "lucide-react";
+import {
+  X,
+  Flame,
+  Clock,
+  Award,
+  Target,
+  RotateCcw,
+  CheckCircle2,
+  Trash2,
+} from "lucide-react";
 
 interface DailyGoalModalProps {
   isOpen: boolean;
   onClose: () => void;
   stats: DailyReadingStats;
-  onStatsUpdated: (stats: DailyReadingStats) => void;
+  onStatsUpdated: (stats: DailyReadingStats, wasReset?: boolean) => void;
 }
 
 export const DailyGoalModal: React.FC<DailyGoalModalProps> = ({
@@ -21,8 +30,14 @@ export const DailyGoalModal: React.FC<DailyGoalModalProps> = ({
   stats,
   onStatsUpdated,
 }) => {
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [showResetMenu, setShowResetMenu] = useState<boolean>(false);
+
   useEffect(() => {
     if (!isOpen) return;
+    setFeedbackMsg(null);
+    setShowResetMenu(false);
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
@@ -43,15 +58,30 @@ export const DailyGoalModal: React.FC<DailyGoalModalProps> = ({
 
   const handleSetTarget = (minutes: number) => {
     const updated = TimerService.setTargetMinutes(minutes);
-    onStatsUpdated(updated);
+    onStatsUpdated(updated, false);
   };
 
   const handleResetToday = () => {
     if (window.confirm("আপনি কি আজকের পঠিত সময় ০ করতে চান?")) {
-      const current = TimerService.getStats();
-      current.secondsToday = 0;
-      TimerService.saveStats(current);
-      onStatsUpdated(current);
+      const updated = TimerService.resetToday();
+      onStatsUpdated(updated, true);
+      setShowResetMenu(false);
+      setFeedbackMsg("আজকের পড়ার সময় সফলভাবে ০:০০ করা হয়েছে।");
+      setTimeout(() => setFeedbackMsg(null), 3500);
+    }
+  };
+
+  const handleResetAll = () => {
+    if (
+      window.confirm(
+        "সতর্কতা: আপনি কি সর্বমোট পঠিত সময়, স্ট্রিক সহ সকল রিডিং পরিসংখ্যান রিসেট করতে চান?",
+      )
+    ) {
+      const updated = TimerService.resetAll();
+      onStatsUpdated(updated, true);
+      setShowResetMenu(false);
+      setFeedbackMsg("সকল রিডিং পরিসংখ্যান সম্পূর্ণ রিসেট করা হয়েছে।");
+      setTimeout(() => setFeedbackMsg(null), 3500);
     }
   };
 
@@ -89,6 +119,14 @@ export const DailyGoalModal: React.FC<DailyGoalModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
+          {/* Feedback Message */}
+          {feedbackMsg && (
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-200">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{feedbackMsg}</span>
+            </div>
+          )}
+
           {/* Progress Card */}
           <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white border border-emerald-200/80 text-center space-y-3">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
@@ -177,15 +215,43 @@ export const DailyGoalModal: React.FC<DailyGoalModalProps> = ({
           </div>
 
           {/* Footer Reset option */}
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-            <span>প্রতিদিন মধ্যরাতে অটো রিসেট হয়</span>
-            <button
-              onClick={handleResetToday}
-              className="inline-flex items-center gap-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>আজকের সময় রিসেট</span>
-            </button>
+          <div className="pt-3 border-t border-slate-100 space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>প্রতিদিন মধ্যরাতে অটো রিসেট হয়</span>
+              <button
+                onClick={() => setShowResetMenu((v) => !v)}
+                className="inline-flex items-center gap-1 text-slate-500 hover:text-red-600 font-medium transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>রিসেট অপশন</span>
+              </button>
+            </div>
+
+            {/* Expandable Reset Menu */}
+            {showResetMenu && (
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={handleResetToday}
+                    className="flex-1 py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-amber-400 hover:bg-amber-50/50 text-slate-700 hover:text-amber-800 text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                    <span>আজকের সময় রিসেট (০:০০)</span>
+                  </button>
+
+                  <button
+                    onClick={handleResetAll}
+                    className="flex-1 py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-red-400 hover:bg-red-50/50 text-slate-700 hover:text-red-700 text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                    <span>সকল ডাটা রিসেট</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 text-center">
+                  রিসেট করলে ক্লাউড এবং এই ডিভাইসে সময় সাথে সাথে আপডেট হবে।
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

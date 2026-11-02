@@ -96,16 +96,21 @@ function App() {
       });
     }
 
-    // Pull when returning to tab
+    // Pull when returning to tab & check day rollover
     const handleVisibilityChange = () => {
-      if (!document.hidden && SyncService.getCredentials()) {
-        SyncService.pullData().then((res) => {
-          if (res.ok && res.hasChanges) {
-            if (res.mergedLastRead !== undefined)
-              setLastRead(res.mergedLastRead);
-            if (res.mergedStats) setTimerStats(res.mergedStats);
-          }
-        });
+      if (!document.hidden) {
+        const currentStats = TimerService.getStats();
+        setTimerStats(currentStats);
+
+        if (SyncService.getCredentials()) {
+          SyncService.pullData().then((res) => {
+            if (res.ok && res.hasChanges) {
+              if (res.mergedLastRead !== undefined)
+                setLastRead(res.mergedLastRead);
+              if (res.mergedStats) setTimerStats(res.mergedStats);
+            }
+          });
+        }
       }
     };
 
@@ -116,9 +121,22 @@ function App() {
       }
     };
 
+    // Periodic check for midnight rollover even if tab stays open idle
+    const rolloverInterval = setInterval(() => {
+      const todayStr = TimerService.getTodayString();
+      setTimerStats((prev) => {
+        if (prev.date !== todayStr) {
+          unsavedSecondsRef.current = 0;
+          return TimerService.getStats();
+        }
+        return prev;
+      });
+    }, 30000);
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("online", handleOnline);
     return () => {
+      clearInterval(rolloverInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnline);
     };
@@ -132,9 +150,16 @@ function App() {
       // Pause if tab is inactive/hidden
       if (document.hidden) return;
 
-      unsavedSecondsRef.current += 1;
+      const todayStr = TimerService.getTodayString();
 
       setTimerStats((prev) => {
+        // Midnight rollover check during active reading
+        if (prev.date !== todayStr) {
+          unsavedSecondsRef.current = 0;
+          return TimerService.getStats();
+        }
+
+        unsavedSecondsRef.current += 1;
         const nextSec = prev.secondsToday + 1;
         const targetSec = prev.targetMinutes * 60;
 
@@ -148,6 +173,7 @@ function App() {
           ...prev,
           secondsToday: nextSec,
           totalAllTimeSeconds: prev.totalAllTimeSeconds + 1,
+          updatedAt: Date.now(),
         };
       });
 
@@ -305,7 +331,10 @@ function App() {
         isOpen={isGoalModalOpen}
         onClose={() => setIsGoalModalOpen(false)}
         stats={timerStats}
-        onStatsUpdated={(newStats) => {
+        onStatsUpdated={(newStats, wasReset) => {
+          if (wasReset) {
+            unsavedSecondsRef.current = 0;
+          }
           setTimerStats(newStats);
           if (isSyncConnected) {
             SyncService.pushData();

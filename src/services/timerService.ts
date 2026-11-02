@@ -5,11 +5,12 @@ export interface DailyReadingStats {
   streakDays: number;
   lastActiveDate: string;
   totalAllTimeSeconds: number;
+  updatedAt?: number;
 }
 
 const STORAGE_KEY = "quran_bn_timer_stats";
 
-function getTodayString(): string {
+export function getTodayString(): string {
   const d = new Date();
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -17,7 +18,7 @@ function getTodayString(): string {
   return `${year}-${month}-${day}`;
 }
 
-function getYesterdayString(): string {
+export function getYesterdayString(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   const year = d.getFullYear();
@@ -27,6 +28,9 @@ function getYesterdayString(): string {
 }
 
 export const TimerService = {
+  getTodayString,
+  getYesterdayString,
+
   getStats(): DailyReadingStats {
     const today = getTodayString();
     const yesterday = getYesterdayString();
@@ -38,6 +42,7 @@ export const TimerService = {
       streakDays: 0,
       lastActiveDate: today,
       totalAllTimeSeconds: 0,
+      updatedAt: Date.now(),
     };
 
     try {
@@ -62,6 +67,7 @@ export const TimerService = {
           stats.date = today;
           stats.secondsToday = 0;
           stats.lastActiveDate = today;
+          stats.updatedAt = Date.now();
 
           this.saveStats(stats);
         }
@@ -75,6 +81,9 @@ export const TimerService = {
 
   saveStats(stats: DailyReadingStats): void {
     try {
+      if (!stats.updatedAt) {
+        stats.updatedAt = Date.now();
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
     } catch (e) {
       console.error("Failed to save timer stats", e);
@@ -85,6 +94,7 @@ export const TimerService = {
     const stats = this.getStats();
     stats.secondsToday += seconds;
     stats.totalAllTimeSeconds += seconds;
+    stats.updatedAt = Date.now();
     this.saveStats(stats);
     return stats;
   },
@@ -92,6 +102,30 @@ export const TimerService = {
   setTargetMinutes(minutes: number): DailyReadingStats {
     const stats = this.getStats();
     stats.targetMinutes = Math.max(1, minutes);
+    stats.updatedAt = Date.now();
+    this.saveStats(stats);
+    return stats;
+  },
+
+  resetToday(): DailyReadingStats {
+    const stats = this.getStats();
+    stats.secondsToday = 0;
+    stats.updatedAt = Date.now();
+    this.saveStats(stats);
+    return stats;
+  },
+
+  resetAll(): DailyReadingStats {
+    const today = getTodayString();
+    const stats: DailyReadingStats = {
+      date: today,
+      targetMinutes: 20,
+      secondsToday: 0,
+      streakDays: 0,
+      lastActiveDate: today,
+      totalAllTimeSeconds: 0,
+      updatedAt: Date.now(),
+    };
     this.saveStats(stats);
     return stats;
   },

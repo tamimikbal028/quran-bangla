@@ -101,45 +101,62 @@ export const SyncService = {
     // 2. Merge Timer Stats
     let mergedStats = { ...localStats };
     if (remote.timerStats) {
-      if (remote.timerStats.date === localStats.date) {
-        const higherSeconds = Math.max(
-          localStats.secondsToday,
-          remote.timerStats.secondsToday,
-        );
-        const higherStreak = Math.max(
-          localStats.streakDays,
-          remote.timerStats.streakDays,
-        );
-        const higherAllTime = Math.max(
-          localStats.totalAllTimeSeconds,
-          remote.timerStats.totalAllTimeSeconds,
-        );
+      const localUpdated = localStats.updatedAt || 0;
+      const remoteUpdated =
+        remote.timerStats.updatedAt || remote.updatedAt || 0;
 
+      if (remote.timerStats.date !== localStats.date) {
         if (
-          higherSeconds !== localStats.secondsToday ||
-          higherStreak !== localStats.streakDays ||
-          higherAllTime !== localStats.totalAllTimeSeconds
+          remoteUpdated > localUpdated ||
+          remote.timerStats.date > localStats.date
         ) {
-          mergedStats = {
-            ...localStats,
-            secondsToday: higherSeconds,
-            streakDays: higherStreak,
-            totalAllTimeSeconds: higherAllTime,
-            targetMinutes:
-              remote.timerStats.targetMinutes || localStats.targetMinutes,
-          };
+          mergedStats = { ...remote.timerStats };
           TimerService.saveStats(mergedStats);
           hasChanges = true;
         }
-      } else if (
-        remote.updatedAt >
-        (localStats.lastActiveDate
-          ? new Date(localStats.lastActiveDate).getTime()
-          : 0)
-      ) {
-        mergedStats = remote.timerStats;
-        TimerService.saveStats(mergedStats);
-        hasChanges = true;
+      } else {
+        // Same date
+        if (remoteUpdated > localUpdated) {
+          // Remote is strictly newer than local (e.g. read on another device or remote reset)
+          mergedStats = { ...localStats, ...remote.timerStats };
+          TimerService.saveStats(mergedStats);
+          hasChanges = true;
+        } else if (localUpdated > remoteUpdated) {
+          // Local is strictly newer (e.g. user just read, reset time, or changed target locally)
+          // Keep local stats and do not overwrite with stale remote data
+        } else {
+          // Timestamps identical or missing: fallback to max
+          const higherSeconds = Math.max(
+            localStats.secondsToday,
+            remote.timerStats.secondsToday,
+          );
+          const higherStreak = Math.max(
+            localStats.streakDays,
+            remote.timerStats.streakDays,
+          );
+          const higherAllTime = Math.max(
+            localStats.totalAllTimeSeconds,
+            remote.timerStats.totalAllTimeSeconds,
+          );
+
+          if (
+            higherSeconds !== localStats.secondsToday ||
+            higherStreak !== localStats.streakDays ||
+            higherAllTime !== localStats.totalAllTimeSeconds
+          ) {
+            mergedStats = {
+              ...localStats,
+              secondsToday: higherSeconds,
+              streakDays: higherStreak,
+              totalAllTimeSeconds: higherAllTime,
+              targetMinutes:
+                remote.timerStats.targetMinutes || localStats.targetMinutes,
+              updatedAt: localUpdated || Date.now(),
+            };
+            TimerService.saveStats(mergedStats);
+            hasChanges = true;
+          }
+        }
       }
     }
 
