@@ -7,8 +7,6 @@ import { Navbar } from "./components/Navbar";
 import { SurahList } from "./components/SurahList";
 import { SurahReader } from "./components/SurahReader";
 import { DailyGoalModal } from "./components/DailyGoalModal";
-import { SyncModal } from "./components/SyncModal";
-import { SyncService } from "./services/syncService";
 import { CheckCircle2 } from "lucide-react";
 
 function App() {
@@ -17,23 +15,14 @@ function App() {
   const [targetAyah, setTargetAyah] = useState<number | undefined>(undefined);
   const [lastRead, setLastRead] = useState<LastRead | null>(null);
 
-  // Daily Timer & Goal State
-  const [timerStats, setTimerStats] = useState<DailyReadingStats>(
+  // Daily Timer & Goal State (Pure Local Storage)
+  const [timerStats, setTimerStats] = useState<DailyReadingStats>(() =>
     TimerService.getStats(),
   );
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(true);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState<boolean>(false);
   const [goalCelebrationToast, setGoalCelebrationToast] =
     useState<boolean>(false);
-
-  // Sync State
-  const [isSyncModalOpen, setIsSyncModalOpen] = useState<boolean>(false);
-  const [isSyncConnected, setIsSyncConnected] = useState<boolean>(
-    () => !!SyncService.getCredentials(),
-  );
-  const [loggedInUsername, setLoggedInUsername] = useState<string | null>(
-    () => SyncService.getCredentials()?.username || null,
-  );
 
   const unsavedSecondsRef = useRef<number>(0);
 
@@ -76,48 +65,27 @@ function App() {
     }
   };
 
-  // Initialize & Background Cloud Sync
+  // Initialize Local Data & Listen for Tab Visibility & Midnight Rollover
   useEffect(() => {
     const list = QuranService.getAllSurahs();
     setSurahs(list);
     setLastRead(QuranService.getLastRead());
     setTimerStats(TimerService.getStats());
 
-    // Auto-sync if connected
-    const creds = SyncService.getCredentials();
-    if (creds) {
-      setIsSyncConnected(true);
-      setLoggedInUsername(creds.username);
-      SyncService.pullData().then((res) => {
-        if (res.ok && res.hasChanges) {
-          if (res.mergedLastRead !== undefined) setLastRead(res.mergedLastRead);
-          if (res.mergedStats) setTimerStats(res.mergedStats);
-        }
-      });
+    // Clean up any legacy sync keys from localStorage
+    try {
+      localStorage.removeItem("quran_bn_user_creds");
+      localStorage.removeItem("quran_bn_last_sync_time");
+      localStorage.removeItem("quran_bn_pending_sync");
+    } catch {
+      // Ignore
     }
 
-    // Pull when returning to tab & check day rollover
+    // Refresh stats & check day rollover when returning to tab
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         const currentStats = TimerService.getStats();
         setTimerStats(currentStats);
-
-        if (SyncService.getCredentials()) {
-          SyncService.pullData().then((res) => {
-            if (res.ok && res.hasChanges) {
-              if (res.mergedLastRead !== undefined)
-                setLastRead(res.mergedLastRead);
-              if (res.mergedStats) setTimerStats(res.mergedStats);
-            }
-          });
-        }
-      }
-    };
-
-    // Auto-sync pending data when internet comes back online
-    const handleOnline = () => {
-      if (SyncService.getCredentials()) {
-        SyncService.syncPending();
       }
     };
 
@@ -134,11 +102,9 @@ function App() {
     }, 30000);
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("online", handleOnline);
     return () => {
       clearInterval(rolloverInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("online", handleOnline);
     };
   }, []);
 
@@ -177,7 +143,7 @@ function App() {
         };
       });
 
-      // Persist to local storage every 5 seconds (NO network call)
+      // Persist to local storage every 5 seconds
       if (unsavedSecondsRef.current >= 5) {
         TimerService.addSeconds(unsavedSecondsRef.current);
         unsavedSecondsRef.current = 0;
@@ -189,10 +155,6 @@ function App() {
       if (unsavedSecondsRef.current > 0) {
         TimerService.addSeconds(unsavedSecondsRef.current);
         unsavedSecondsRef.current = 0;
-      }
-      // Sync to cloud ONLY when timer stops or reader is closed
-      if (SyncService.getCredentials()) {
-        SyncService.pushData();
       }
     };
   }, [selectedSurahId, isTimerRunning]);
@@ -213,9 +175,6 @@ function App() {
     }
     setLastRead(QuranService.getLastRead());
     setTimerStats(TimerService.getStats());
-    if (isSyncConnected) {
-      SyncService.pushData();
-    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -241,7 +200,7 @@ function App() {
         </div>
       )}
 
-      {/* Navbar with Daily Goal Widget & Cloud Sync */}
+      {/* Navbar with Daily Goal Widget */}
       <Navbar
         currentSurahId={selectedSurahId}
         onBackToList={handleBackToList}
@@ -250,23 +209,14 @@ function App() {
         onToggleTimer={() => {
           setIsTimerRunning((r) => {
             const next = !r;
-            // When timer is paused/turned off, save seconds and push to cloud
-            if (!next) {
-              if (unsavedSecondsRef.current > 0) {
-                TimerService.addSeconds(unsavedSecondsRef.current);
-                unsavedSecondsRef.current = 0;
-              }
-              if (SyncService.getCredentials()) {
-                SyncService.pushData();
-              }
+            if (!next && unsavedSecondsRef.current > 0) {
+              TimerService.addSeconds(unsavedSecondsRef.current);
+              unsavedSecondsRef.current = 0;
             }
             return next;
           });
         }}
         onOpenGoalModal={() => setIsGoalModalOpen(true)}
-        isSyncConnected={isSyncConnected}
-        loggedInUsername={loggedInUsername}
-        onOpenSyncModal={() => setIsSyncModalOpen(true)}
       />
 
       {/* PWA Offline Install Banner */}
@@ -310,9 +260,6 @@ function App() {
             onBackToList={handleBackToList}
             onLastReadUpdated={(lr) => {
               setLastRead(lr);
-              if (isSyncConnected) {
-                SyncService.pushData();
-              }
             }}
           />
         ) : (
@@ -336,27 +283,6 @@ function App() {
             unsavedSecondsRef.current = 0;
           }
           setTimerStats(newStats);
-          if (isSyncConnected) {
-            SyncService.pushData();
-          }
-        }}
-      />
-
-      {/* Cloud Sync / Account Modal */}
-      <SyncModal
-        isOpen={isSyncModalOpen}
-        onClose={() => {
-          setIsSyncModalOpen(false);
-          const current = SyncService.getCredentials();
-          setIsSyncConnected(!!current);
-          setLoggedInUsername(current?.username || null);
-        }}
-        onDataSynced={({ lastRead: lr, timerStats: ts }) => {
-          if (lr !== undefined) setLastRead(lr);
-          if (ts) setTimerStats(ts);
-          const current = SyncService.getCredentials();
-          setIsSyncConnected(!!current);
-          setLoggedInUsername(current?.username || null);
         }}
       />
 

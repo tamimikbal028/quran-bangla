@@ -248,7 +248,7 @@ export const DailyGoalModal: React.FC<DailyGoalModalProps> = ({
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-400 text-center">
-                  রিসেট করলে ক্লাউড এবং এই ডিভাইসে সময় সাথে সাথে আপডেট হবে।
+                  রিসেট করলে এই ডিভাইসের সংরক্ষিত পড়ার সময় সাথে সাথে ০ হবে।
                 </p>
               </div>
             )}

@@ -7,7 +7,6 @@ import {
   Flame,
   Pause,
   Play,
-  User,
 } from "lucide-react";
 import type { DailyReadingStats } from "../services/timerService";
 import { formatTimeMMSS, toBengaliNumber } from "../utils/bengali";
@@ -19,9 +18,6 @@ interface NavbarProps {
   isTimerRunning: boolean;
   onToggleTimer: () => void;
   onOpenGoalModal: () => void;
-  isSyncConnected: boolean;
-  loggedInUsername?: string | null;
-  onOpenSyncModal: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -31,9 +27,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   isTimerRunning,
   onToggleTimer,
   onOpenGoalModal,
-  isSyncConnected,
-  loggedInUsername,
-  onOpenSyncModal,
 }) => {
   return (
     <header className="border-b border-emerald-900/10 bg-white/95 backdrop-blur-md sticky top-0 z-40 transition-shadow">
@@ -69,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Right Section: Reading Timer, Cloud Sync & Navigation */}
+        {/* Right Section: Reading Timer & Navigation */}
         <div className="flex items-center gap-2">
           {/* Daily Goal Timer Pill */}
           <div className="flex items-center bg-slate-100/90 rounded-2xl p-1 border border-slate-200/80 shadow-2xs">
@@ -116,37 +109,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
           </div>
-
-          {/* User Account / Sync Button */}
-          <button
-            onClick={onOpenSyncModal}
-            className={`py-1.5 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs ${
-              isSyncConnected
-                ? "text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-emerald-200/90"
-                : "text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border-slate-200/90"
-            }`}
-            title={
-              isSyncConnected
-                ? `লগইন আছেন: ${loggedInUsername || "ব্যবহারকারী"} (অটো-সিঙ্ক সক্রিয়)`
-                : "অ্যাকাউন্টে লগইন বা সাইন আপ করুন"
-            }
-            aria-label="অ্যাকাউন্ট"
-          >
-            {isSyncConnected ? (
-              <>
-                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                <User className="w-3.5 h-3.5 text-emerald-700" />
-                <span className="max-w-[80px] truncate hidden xs:inline">
-                  {loggedInUsername || "অ্যাকাউন্ট"}
-                </span>
-              </>
-            ) : (
-              <>
-                <User className="w-3.5 h-3.5 text-slate-500" />
-                <span>লগইন</span>
-              </>
-            )}
-          </button>
 
           {/* Surah List Button if inside reader */}
           {currentSurahId !== null && (
