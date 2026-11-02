@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   AlignLeft,
   ArrowUp,
+  X,
 } from 'lucide-react';
 
 interface SurahReaderProps {
@@ -33,8 +34,10 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
   const [readingMode, setReadingMode] = useState<ReadingMode>('cards');
   const [fontSize, setFontSize] = useState<FontSize>('lg');
   const [inSurahQuery, setInSurahQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [copiedAyah, setCopiedAyah] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const ayahRefs = useRef<{ [key: number]: HTMLElement | null }>({});
 
@@ -45,6 +48,19 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
       setToastMessage(null);
     }, 2000);
   };
+
+  // Track scroll position for floating back-to-top button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 400) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Load Surah detail
   useEffect(() => {
@@ -98,21 +114,21 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
     });
   };
 
-  // Font size classes
+  // Font size classes optimized for mobile & desktop
   const fontClass = useMemo(() => {
     switch (fontSize) {
       case 'sm':
         return 'text-base sm:text-lg leading-relaxed';
       case 'base':
-        return 'text-lg sm:text-xl leading-relaxed';
+        return 'text-lg sm:text-xl leading-relaxed sm:leading-loose';
       case 'lg':
-        return 'text-xl sm:text-2xl leading-loose';
+        return 'text-xl sm:text-2xl leading-relaxed sm:leading-loose';
       case 'xl':
-        return 'text-2xl sm:text-3xl leading-loose';
+        return 'text-2xl sm:text-3xl leading-relaxed sm:leading-loose';
       case '2xl':
-        return 'text-3xl sm:text-4xl leading-loose';
+        return 'text-2xl sm:text-4xl leading-loose';
       default:
-        return 'text-xl sm:text-2xl leading-loose';
+        return 'text-xl sm:text-2xl leading-relaxed sm:leading-loose';
     }
   }, [fontSize]);
 
@@ -152,7 +168,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
         </h3>
         <button
           onClick={onBackToList}
-          className="px-4 py-2 rounded-xl bg-slate-800 text-white text-sm"
+          className="px-5 py-2.5 rounded-xl bg-slate-800 text-white text-sm"
         >
           তালিকায় ফিরে যান
         </button>
@@ -161,141 +177,183 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="max-w-4xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/95 text-white px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 text-xs sm:text-sm flex items-center gap-2 backdrop-blur-md transition-all">
-          <Check className="w-4 h-4 text-emerald-400" />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 z-50 bg-slate-900/95 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 text-xs sm:text-sm flex items-center gap-2 backdrop-blur-md transition-all whitespace-nowrap">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
+      {/* Floating Scroll to Top FAB (Mobile Friendly) */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-4 sm:bottom-8 sm:right-8 z-40 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white shadow-lg flex items-center justify-center transition-all cursor-pointer active:scale-95"
+          title="পৃষ্ঠার শুরুতে যান"
+          aria-label="পৃষ্ঠার শুরুতে যান"
+        >
+          <ArrowUp className="w-5 h-5" />
+        </button>
+      )}
+
       {/* Surah Top Header Banner */}
-      <div className="rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white p-6 sm:p-8 shadow-lg shadow-emerald-900/10 space-y-4 relative overflow-hidden">
+      <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white p-4 sm:p-8 shadow-lg shadow-emerald-900/10 space-y-3 sm:space-y-4 relative overflow-hidden">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-60 h-60 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
         {/* Navigation between surahs */}
-        <div className="flex items-center justify-between text-xs sm:text-sm font-medium text-emerald-100">
+        <div className="flex items-center justify-between text-xs sm:text-sm font-medium text-emerald-100 gap-1">
           <button
             onClick={() => onSelectSurah(surahId - 1)}
             disabled={surahId <= 1}
-            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors ${
-              surahId <= 1 ? 'opacity-40 pointer-events-none' : 'cursor-pointer'
+            className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors ${
+              surahId <= 1 ? 'opacity-30 pointer-events-none' : 'cursor-pointer active:scale-95'
             }`}
           >
-            <ChevronLeft className="w-4 h-4" />
-            <span>পূর্ববর্তী সূরা</span>
+            <ChevronLeft className="w-4 h-4 shrink-0" />
+            <span className="truncate">পূর্ববর্তী</span>
           </button>
 
-          <span className="text-white/80 font-semibold">
-            সূরা নম্বর {toBengaliNumber(surahId)} / {toBengaliNumber(114)}
+          <span className="text-white/90 font-semibold text-xs sm:text-sm whitespace-nowrap text-center">
+            সূরা {toBengaliNumber(surahId)} / {toBengaliNumber(114)}
           </span>
 
           <button
             onClick={() => onSelectSurah(surahId + 1)}
             disabled={surahId >= 114}
-            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors ${
-              surahId >= 114 ? 'opacity-40 pointer-events-none' : 'cursor-pointer'
+            className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors ${
+              surahId >= 114 ? 'opacity-30 pointer-events-none' : 'cursor-pointer active:scale-95'
             }`}
           >
-            <span>পরবর্তী সূরা</span>
-            <ChevronRight className="w-4 h-4" />
+            <span className="truncate">পরবর্তী</span>
+            <ChevronRight className="w-4 h-4 shrink-0" />
           </button>
         </div>
 
         {/* Title & Info */}
-        <div className="text-center space-y-2 pt-2">
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+        <div className="text-center space-y-1.5 sm:space-y-2 pt-1 sm:pt-2">
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
             সূরা {surahMeta.banglaName}
           </h1>
-          <p className="text-emerald-100 text-sm sm:text-base font-medium">
+          <p className="text-emerald-100 text-xs sm:text-base font-medium">
             অর্থ: {surahMeta.translation}
           </p>
-          <div className="inline-flex items-center gap-2 pt-2 text-xs text-emerald-200">
-            <span className="px-2.5 py-1 rounded-md bg-white/15 border border-white/20">
-              অবতীর্ণ: {getRevelationTypeBengali(surahMeta.type)}
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 pt-1 text-[11px] sm:text-xs text-emerald-200">
+            <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md bg-white/15 border border-white/20">
+              {getRevelationTypeBengali(surahMeta.type)}
             </span>
-            <span className="px-2.5 py-1 rounded-md bg-white/15 border border-white/20">
-              মোট আয়াত: {toBengaliNumber(surahMeta.total_verses)}
+            <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md bg-white/15 border border-white/20">
+              {toBengaliNumber(surahMeta.total_verses)} আয়াত
             </span>
           </div>
         </div>
       </div>
 
-      {/* Reader Controls Bar */}
-      <div className="sticky top-20 z-30 p-3 sm:p-4 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
-        {/* Left: Reading Mode Toggle */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl w-full md:w-auto justify-center">
-          <button
-            onClick={() => setReadingMode('cards')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              readingMode === 'cards'
-                ? 'bg-white text-emerald-800 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>আয়াতভিত্তিক পাঠ</span>
-          </button>
-          <button
-            onClick={() => setReadingMode('continuous')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              readingMode === 'continuous'
-                ? 'bg-white text-emerald-800 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <AlignLeft className="w-3.5 h-3.5" />
-            <span>ধারাবাহিক পাঠ (বই)</span>
-          </button>
-        </div>
-
-        {/* Middle: In-Surah Search */}
-        <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={inSurahQuery}
-            onChange={(e) => setInSurahQuery(e.target.value)}
-            placeholder="এই সূরায় খুঁজুন..."
-            className="w-full pl-9 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-          />
-          {inSurahQuery && (
+      {/* Mobile-Optimized Reader Controls Bar */}
+      <div className="sticky top-16 z-30 p-2 sm:p-3 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-xs space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          {/* Reading Mode Switcher */}
+          <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-xl">
             <button
-              onClick={() => setInSurahQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-700 cursor-pointer"
+              onClick={() => setReadingMode('cards')}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                readingMode === 'cards'
+                  ? 'bg-white text-emerald-800 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="আয়াতভিত্তিক কার্ড মোড"
             >
-              ✕
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="text-[11px] sm:text-xs">আয়াত</span>
             </button>
-          )}
-        </div>
-
-        {/* Right: Font Size Controls */}
-        <div className="flex items-center gap-1 text-xs">
-          <span className="text-slate-400 mr-1 text-[11px] hidden sm:inline">ফন্ট সাইজ:</span>
-          {(['sm', 'base', 'lg', 'xl'] as FontSize[]).map((size) => (
             <button
-              key={size}
-              onClick={() => setFontSize(size)}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
-                fontSize === size
-                  ? 'bg-emerald-600 text-white'
+              onClick={() => setReadingMode('continuous')}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                readingMode === 'continuous'
+                  ? 'bg-white text-emerald-800 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="ধারাবাহিক বই মোড"
+            >
+              <AlignLeft className="w-3.5 h-3.5" />
+              <span className="text-[11px] sm:text-xs">বই</span>
+            </button>
+          </div>
+
+          {/* Right Action: Font Sizes & Search Toggle */}
+          <div className="flex items-center gap-1.5">
+            {/* Font Size Pills */}
+            <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-xl">
+              {(['sm', 'base', 'lg', 'xl'] as FontSize[]).map((size) => (
+                <button
+                  key={size}
+                  onClick={() => setFontSize(size)}
+                  className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer ${
+                    fontSize === size
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {size === 'sm' && 'ছোট'}
+                  {size === 'base' && 'স্বাভাবিক'}
+                  {size === 'lg' && 'বড়'}
+                  {size === 'xl' && 'বিশাল'}
+                </button>
+              ))}
+            </div>
+
+            {/* In-Surah Search Toggle Button */}
+            <button
+              onClick={() => setIsSearchOpen((prev) => !prev)}
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                isSearchOpen || inSurahQuery
+                  ? 'bg-emerald-100 text-emerald-800'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
+              title="এই সূরায় খুঁজুন"
+              aria-label="এই সূরায় খুঁজুন"
             >
-              {size === 'sm' && 'ছোট'}
-              {size === 'base' && 'স্বাভাবিক'}
-              {size === 'lg' && 'বড়'}
-              {size === 'xl' && 'অনেক বড়'}
+              <Search className="w-4 h-4" />
             </button>
-          ))}
+          </div>
         </div>
+
+        {/* Collapsible Search Input */}
+        {(isSearchOpen || inSurahQuery) && (
+          <div className="relative pt-1 animate-in fade-in duration-150">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={inSurahQuery}
+              onChange={(e) => setInSurahQuery(e.target.value)}
+              placeholder="এই সূরার আয়াতে কোনো শব্দ খুঁজুন..."
+              autoFocus
+              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+            />
+            {inSurahQuery ? (
+              <button
+                onClick={() => setInSurahQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700 cursor-pointer p-1"
+              >
+                ✕
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsSearchOpen(false)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer p-1"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bismillah Header (Except Surah At-Tawbah #9) */}
       {surahId !== 9 && (
-        <div className="py-6 px-4 text-center bg-emerald-50/70 border border-emerald-200/70 rounded-2xl">
-          <p className="text-emerald-900 font-semibold text-lg sm:text-xl tracking-wide font-sans">
+        <div className="py-4 sm:py-6 px-4 text-center bg-emerald-50/70 border border-emerald-200/70 rounded-2xl">
+          <p className="text-emerald-900 font-semibold text-base sm:text-xl tracking-wide font-sans">
             পরম করুণাময় অসীম দয়ালু আল্লাহর নামে
           </p>
         </div>
@@ -303,7 +361,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
 
       {/* Search results notice */}
       {inSurahQuery && (
-        <div className="px-4 py-2 rounded-xl bg-amber-50 text-amber-800 text-xs flex items-center justify-between border border-amber-200">
+        <div className="px-3.5 py-2 rounded-xl bg-amber-50 text-amber-800 text-xs flex items-center justify-between border border-amber-200">
           <span>
             খুঁজে পাওয়া গেছে: <strong>{toBengaliNumber(filteredAyahs.length)}</strong> টি আয়াত
           </span>
@@ -318,8 +376,8 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
 
       {/* MAIN CONTENT BASED ON READING MODE */}
       {readingMode === 'cards' ? (
-        /* Ayah-by-Ayah Cards Mode */
-        <div className="space-y-4">
+        /* Ayah-by-Ayah Cards Mode (Mobile Optimized) */
+        <div className="space-y-3 sm:space-y-4">
           {filteredAyahs.map((ayah) => {
             const isCopied = copiedAyah === ayah.numberInSurah;
 
@@ -329,19 +387,19 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                 ref={(el) => {
                   ayahRefs.current[ayah.numberInSurah] = el;
                 }}
-                className={`p-5 sm:p-6 rounded-2xl bg-white border transition-all duration-200 shadow-xs space-y-4 ${
+                className={`p-4 sm:p-6 rounded-2xl bg-white border transition-all duration-200 shadow-2xs space-y-3 sm:space-y-4 ${
                   targetAyah === ayah.numberInSurah
                     ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/15'
-                    : 'border-slate-200 hover:border-emerald-300'
+                    : 'border-slate-200/90'
                 }`}
               >
                 {/* Ayah Top Bar */}
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center">
+                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center shrink-0">
                       {toBengaliNumber(ayah.numberInSurah)}
                     </span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-[11px] sm:text-xs text-slate-400">
                       আয়াত {toBengaliNumber(ayah.numberInSurah)}
                     </span>
                   </div>
@@ -349,7 +407,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                   {/* Copy Button */}
                   <button
                     onClick={() => handleCopyAyah(ayah.numberInSurah, ayah.text)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer active:scale-95 ${
                       isCopied
                         ? 'bg-emerald-50 text-emerald-700 font-medium'
                         : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
@@ -365,7 +423,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                     ) : (
                       <>
                         <Copy className="w-3.5 h-3.5" />
-                        <span className="text-[11px] hidden sm:inline">কপি</span>
+                        <span className="text-[11px] hidden xs:inline">কপি</span>
                       </>
                     )}
                   </button>
@@ -373,7 +431,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
 
                 {/* Pure Bengali Ayah Text */}
                 <p
-                  className={`text-slate-800 font-sans ${fontClass} select-text tracking-normal`}
+                  className={`text-slate-800 font-sans ${fontClass} select-text tracking-normal break-words`}
                 >
                   {ayah.text}
                 </p>
@@ -383,8 +441,8 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
         </div>
       ) : (
         /* Continuous Flow Mode (Book Mode) */
-        <div className="p-6 sm:p-10 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-6">
-          <div className={`text-slate-800 font-sans ${fontClass} leading-loose text-justify`}>
+        <div className="p-4 sm:p-10 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4 sm:space-y-6">
+          <div className={`text-slate-800 font-sans ${fontClass} leading-relaxed sm:leading-loose text-justify break-words`}>
             {filteredAyahs.map((ayah) => {
               return (
                 <span
@@ -396,7 +454,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                 >
                   <span>{ayah.text} </span>
                   <span
-                    className="inline-flex items-center justify-center min-w-[24px] h-[24px] px-1.5 rounded-full text-[12px] font-bold mx-1 align-baseline bg-emerald-100 text-emerald-900"
+                    className="inline-flex items-center justify-center min-w-[22px] h-[22px] sm:min-w-[24px] sm:h-[24px] px-1 sm:px-1.5 rounded-full text-[11px] sm:text-[12px] font-bold mx-0.5 sm:mx-1 align-baseline bg-emerald-100 text-emerald-900 shrink-0"
                     title={`আয়াত ${toBengaliNumber(ayah.numberInSurah)}`}
                   >
                     {toBengaliNumber(ayah.numberInSurah)}
@@ -406,23 +464,23 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
             })}
           </div>
 
-          <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-400">
+          <div className="pt-3 border-t border-slate-100 text-center text-[11px] sm:text-xs text-slate-400">
             ধারাবাহিক পাঠ মোড • পুরো সূরার অর্থ একটানা পড়ার জন্য।
           </div>
         </div>
       )}
 
       {/* Bottom Navigation Buttons */}
-      <div className="pt-6 pb-12 flex items-center justify-between gap-4">
+      <div className="pt-4 pb-12 flex items-center justify-between gap-2 sm:gap-4">
         {surahId > 1 ? (
           <button
             onClick={() => {
               onSelectSurah(surahId - 1);
               scrollToTop();
             }}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-emerald-800 text-xs sm:text-sm font-semibold transition-all shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-emerald-800 text-xs sm:text-sm font-semibold transition-all shadow-2xs cursor-pointer active:scale-95"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-4 h-4 shrink-0" />
             <span>পূর্ববর্তী সূরা</span>
           </button>
         ) : (
@@ -431,11 +489,11 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
 
         <button
           onClick={scrollToTop}
-          className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs sm:text-sm font-medium transition-colors cursor-pointer"
           title="উপরে যান"
         >
           <ArrowUp className="w-4 h-4" />
-          <span className="hidden sm:inline">পৃষ্ঠার শুরুতে</span>
+          <span className="hidden sm:inline">শুরুতে যান</span>
         </button>
 
         {surahId < 114 ? (
@@ -444,10 +502,10 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
               onSelectSurah(surahId + 1);
               scrollToTop();
             }}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition-all shadow-sm shadow-emerald-700/20 cursor-pointer"
+            className="inline-flex items-center gap-1 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition-all shadow-xs cursor-pointer active:scale-95"
           >
             <span>পরবর্তী সূরা</span>
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-4 h-4 shrink-0" />
           </button>
         ) : (
           <div />

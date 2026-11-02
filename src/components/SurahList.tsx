@@ -66,9 +66,9 @@ export const SurahList: React.FC<SurahListProps> = ({
   }, [surahs, activeTab, searchTerm]);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+    <div className="max-w-5xl mx-auto px-3.5 sm:px-6 py-4 sm:py-8 space-y-5 sm:space-y-8">
       {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white p-6 sm:p-9 shadow-lg shadow-emerald-900/10">
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white p-5 sm:p-9 shadow-lg shadow-emerald-900/10">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 max-w-2xl space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/15 text-emerald-100 border border-white/20">
@@ -242,41 +242,41 @@ export const SurahList: React.FC<SurahListProps> = ({
 
         {/* Tab Filters */}
         <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/60">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/60 overflow-x-auto no-scrollbar max-w-full">
             <button
-              onClick={() => setActiveTab("all")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "all"
-                  ? "bg-white text-emerald-800 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
+              onClick={() => setActiveTab('all')}
+              className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'all'
+                  ? 'bg-white text-emerald-800 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               সকল সূরা ({toBengaliNumber(114)})
             </button>
             <button
-              onClick={() => setActiveTab("meccan")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "meccan"
-                  ? "bg-white text-emerald-800 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
+              onClick={() => setActiveTab('meccan')}
+              className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'meccan'
+                  ? 'bg-white text-emerald-800 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               মাক্কী ({toBengaliNumber(86)})
             </button>
             <button
-              onClick={() => setActiveTab("medinan")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "medinan"
-                  ? "bg-white text-emerald-800 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
+              onClick={() => setActiveTab('medinan')}
+              className={`px-3 sm:px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'medinan'
+                  ? 'bg-white text-emerald-800 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               মাদানী ({toBengaliNumber(28)})
             </button>
           </div>
 
-          <span className="text-xs text-slate-500">
-            মোট {toBengaliNumber(filteredSurahs.length)}টি সূরা প্রদর্শিত
+          <span className="text-[11px] sm:text-xs text-slate-500">
+            মোট {toBengaliNumber(filteredSurahs.length)}টি সূরা
           </span>
         </div>
       </div>
