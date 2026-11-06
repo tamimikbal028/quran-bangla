@@ -588,15 +588,10 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                       >
                         <span>{ayah.text} </span>
                         <span
-                          className={`inline-flex items-center justify-center min-w-[22px] h-[22px] sm:min-w-[24px] sm:h-[24px] px-1 sm:px-1.5 rounded-full text-[11px] sm:text-[12px] font-bold mx-0.5 sm:mx-1 align-baseline transition-all shrink-0 ${
-                            isThisMarked
-                              ? "bg-emerald-600 text-white ring-2 ring-emerald-400 shadow-xs scale-105"
-                              : "bg-emerald-100 text-emerald-900"
-                          }`}
+                          className={`inline-grid place-items-center min-w-[22px] h-[22px] sm:min-w-[24px] sm:h-[24px] px-1 sm:px-1.5 rounded-full text-[11px] sm:text-[12px] font-bold leading-none font-['Hind_Siliguri',sans-serif] mx-0.5 sm:mx-1 align-middle transition-all shrink-0 ${
+                            "bg-emerald-100 text-emerald-900 " + (isThisMarked ? "ring-1 ring-emerald-600" : "")}`}
                         >
-                          {isThisMarked
-                            ? `✓${toBengaliNumber(ayah.numberInSurah)}`
-                            : toBengaliNumber(ayah.numberInSurah)}
+                          {toBengaliNumber(ayah.numberInSurah)}
                         </span>{" "}
                       </span>
                     );
@@ -745,15 +740,9 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                 >
                   <span>{ayah.text} </span>
                   <span
-                    className={`inline-flex items-center justify-center min-w-[22px] h-[22px] sm:min-w-[24px] sm:h-[24px] px-1 sm:px-1.5 rounded-full text-[11px] sm:text-[12px] font-bold mx-0.5 sm:mx-1 align-baseline transition-all shrink-0 ${
-                      isThisMarked
-                        ? "bg-emerald-600 text-white ring-2 ring-emerald-400 shadow-xs scale-105"
-                        : "bg-emerald-100 text-emerald-900"
-                    }`}
+                    className={`inline-grid place-items-center min-w-[22px] h-[22px] sm:min-w-[24px] sm:h-[24px] px-1 sm:px-1.5 rounded-full text-[11px] sm:text-[12px] font-bold leading-none font-['Hind_Siliguri',sans-serif] mx-0.5 sm:mx-1 align-middle transition-all shrink-0 bg-emerald-100 text-emerald-900 ${isThisMarked ? "ring-2 ring-emerald-600" : ""}`}
                   >
-                    {isThisMarked
-                      ? `✓${toBengaliNumber(ayah.numberInSurah)}`
-                      : toBengaliNumber(ayah.numberInSurah)}
+                    {toBengaliNumber(ayah.numberInSurah)}
                   </span>{" "}
                 </span>
               );
