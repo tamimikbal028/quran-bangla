@@ -6,9 +6,14 @@ import type {
   FontSize,
   LastRead,
   Ayah,
+  QuranLanguage,
 } from "../types/quran";
 import { QuranService } from "../services/quranService";
-import { toBengaliNumber, getRevelationTypeBengali } from "../utils/bengali";
+import {
+  toBengaliNumber,
+  toArabicNumber,
+  getRevelationTypeBengali,
+} from "../utils/bengali";
 import {
   ChevronLeft,
   ChevronRight,
@@ -27,6 +32,7 @@ import {
 interface SurahReaderProps {
   surahId: number;
   surahMeta: SurahMeta;
+  language: QuranLanguage;
   targetAyah?: number;
   onSelectSurah: (id: number) => void;
   onBackToList: () => void;
@@ -44,6 +50,7 @@ interface RukuGroup {
 export const SurahReader: React.FC<SurahReaderProps> = ({
   surahId,
   surahMeta,
+  language,
   targetAyah,
   onSelectSurah,
   onBackToList,
@@ -59,10 +66,16 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [currentLastRead, setCurrentLastRead] = useState<LastRead | null>(() =>
-    QuranService.getLastRead(),
+    QuranService.getLastRead(language),
   );
 
+  const isArabic = language === "ar";
   const ayahRefs = useRef<{ [key: number]: HTMLElement | null }>({});
+
+  // Sync currentLastRead when language changes
+  useEffect(() => {
+    setCurrentLastRead(QuranService.getLastRead(language));
+  }, [language]);
 
   // Show Toast Helper
   const showToast = (msg: string) => {
@@ -90,7 +103,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
     let isMounted = true;
     setLoading(true);
 
-    QuranService.getSurahDetail(surahId)
+    QuranService.getSurahDetail(surahId, language)
       .then((detail) => {
         if (isMounted && detail) {
           setSurahDetail(detail);
@@ -105,7 +118,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [surahId]);
+  }, [surahId, language]);
 
   // Scroll to target ayah if provided (e.g. from Home's "পড়া চালিয়ে যান")
   useEffect(() => {
@@ -128,11 +141,11 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
       ayahNumber,
       updatedAt: Date.now(),
     };
-    QuranService.setLastRead(updated);
+    QuranService.setLastRead(updated, language);
     setCurrentLastRead(updated);
     onLastReadUpdated?.(updated);
     showToast(
-      `পড়ার স্থান চিহ্নিত: ${surahMeta.banglaName}, আয়াত ${toBengaliNumber(ayahNumber)}`,
+      `পড়ার স্থান চিহ্নিত (${isArabic ? "আরবি" : "বাংলা"}): ${surahMeta.banglaName}, আয়াত ${toBengaliNumber(ayahNumber)}`,
     );
   };
 
@@ -216,8 +229,25 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
       .filter((group) => group.ayahs.length > 0);
   }, [rukuGroups, inSurahQuery]);
 
-  // Font size classes optimized for mobile & desktop
+  // Font size classes optimized for mobile & desktop (Bangla vs Indo-Pak Arabic)
   const fontClass = useMemo(() => {
+    if (isArabic) {
+      switch (fontSize) {
+        case "sm":
+          return "text-2xl sm:text-3xl leading-[2.3] sm:leading-[2.5]";
+        case "base":
+          return "text-3xl sm:text-4xl leading-[2.4] sm:leading-[2.6]";
+        case "lg":
+          return "text-3xl sm:text-[42px] leading-[2.5] sm:leading-[2.7]";
+        case "xl":
+          return "text-4xl sm:text-5xl leading-[2.6] sm:leading-[2.8]";
+        case "2xl":
+          return "text-4xl sm:text-6xl leading-[2.7]";
+        default:
+          return "text-3xl sm:text-[42px] leading-[2.5] sm:leading-[2.7]";
+      }
+    }
+
     switch (fontSize) {
       case "sm":
         return "text-base sm:text-lg leading-relaxed";
@@ -232,7 +262,7 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
       default:
         return "text-xl sm:text-2xl leading-relaxed sm:leading-loose";
     }
-  }, [fontSize]);
+  }, [fontSize, isArabic]);
 
   // Filtered Ayahs if in-surah search active (for cards & continuous)
   const filteredAyahs = useMemo(() => {
@@ -339,6 +369,14 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
 
         {/* Title & Info */}
         <div className="text-center space-y-1.5 sm:space-y-2 pt-1 sm:pt-2">
+          {isArabic && (
+            <p
+              dir="rtl"
+              className="font-arabic text-3xl sm:text-5xl text-emerald-100 leading-normal"
+            >
+              سُوْرَةُ {surahMeta.name}
+            </p>
+          )}
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
             সূরা {surahMeta.banglaName}
           </h1>
@@ -346,6 +384,9 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
             অর্থ: {surahMeta.translation}
           </p>
           <div className="inline-flex items-center gap-1.5 sm:gap-2 pt-1 text-[11px] sm:text-xs text-emerald-200 flex-wrap justify-center">
+            <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md bg-white/15 border border-white/20">
+              {isArabic ? "ইন্দো-পাক আরবি" : "বাংলা অনুবাদ"}
+            </span>
             <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md bg-white/15 border border-white/20">
               {getRevelationTypeBengali(surahMeta.type)}
             </span>
@@ -478,12 +519,21 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
         )}
       </div>
 
-      {/* Bismillah Header (Except Surah At-Tawbah #9) */}
-      {surahId !== 9 && (
+      {/* Bismillah Header (Except Surah At-Tawbah #9, and in Arabic mode Surah #1 already has Bismillah as Ayah 1) */}
+      {surahId !== 9 && !(isArabic && surahId === 1) && (
         <div className="py-4 sm:py-6 px-4 text-center bg-emerald-50/70 border border-emerald-200/70 rounded-2xl">
-          <p className="text-emerald-900 font-semibold text-base sm:text-xl tracking-wide font-sans">
-            পরম করুণাময় অসীম দয়ালু আল্লাহর নামে
-          </p>
+          {isArabic ? (
+            <p
+              dir="rtl"
+              className="text-emerald-900 font-normal text-2xl sm:text-4xl tracking-normal font-arabic leading-relaxed"
+            >
+              بِسۡمِ اللّٰهِ الرَّحۡمٰنِ الرَّحِيۡمِ
+            </p>
+          ) : (
+            <p className="text-emerald-900 font-semibold text-base sm:text-xl tracking-wide font-sans">
+              পরম করুণাময় অসীম দয়ালু আল্লাহর নামে
+            </p>
+          )}
         </div>
       )}
 
@@ -562,7 +612,12 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
 
                 {/* Ruku Cohesive Paragraph */}
                 <div
-                  className={`text-slate-800 font-sans ${fontClass} leading-relaxed sm:leading-loose text-justify break-words`}
+                  dir={isArabic ? "rtl" : "ltr"}
+                  className={`text-slate-800 ${
+                    isArabic
+                      ? "font-arabic text-right"
+                      : "font-sans text-justify leading-relaxed sm:leading-loose"
+                  } ${fontClass} break-words`}
                 >
                   {group.ayahs.map((ayah) => {
                     const isThisMarked =
@@ -588,11 +643,13 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                       >
                         <span>{ayah.text} </span>
                         <span
-                          className={`inline-grid place-items-center min-w-[22px] h-[22px] sm:min-w-[24px] sm:h-[24px] px-1 sm:px-1.5 rounded-full text-[11px] sm:text-[12px] font-bold leading-none font-['Hind_Siliguri',sans-serif] mx-0.5 sm:mx-1 align-middle transition-all shrink-0 bg-emerald-100 text-emerald-900 ${
+                          className={`inline-grid place-items-center min-w-[24px] h-[24px] sm:min-w-[26px] sm:h-[26px] px-1.5 rounded-full text-[11px] sm:text-[13px] font-bold leading-none font-['Hind_Siliguri',sans-serif] mx-1 align-middle transition-all shrink-0 bg-emerald-100 text-emerald-900 ${
                             isThisMarked ? "ring-1 ring-emerald-600" : ""
                           }`}
                         >
-                          {toBengaliNumber(ayah.numberInSurah)}
+                          {isArabic
+                            ? toArabicNumber(ayah.numberInSurah)
+                            : toBengaliNumber(ayah.numberInSurah)}
                         </span>{" "}
                       </span>
                     );
@@ -702,10 +759,15 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                   </div>
                 </div>
 
-                {/* Pure Bengali Ayah Text - clicking also marks as last read */}
+                {/* Ayah Text - clicking also marks as last read */}
                 <p
+                  dir={isArabic ? "rtl" : "ltr"}
                   onClick={() => handleSetLastRead(ayah.numberInSurah)}
-                  className={`text-slate-800 font-sans ${fontClass} select-text tracking-normal break-words cursor-pointer hover:text-slate-950 transition-colors`}
+                  className={`text-slate-800 ${
+                    isArabic
+                      ? "font-arabic text-right"
+                      : "font-sans"
+                  } ${fontClass} select-text tracking-normal break-words cursor-pointer hover:text-slate-950 transition-colors`}
                   title="ক্লিক করে এই আয়াত পর্যন্ত পড়ার অবস্থান সেভ করুন"
                 >
                   {ayah.text}
@@ -718,7 +780,12 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
         /* 3. CONTINUOUS FLOW MODE (BOOK MODE) */
         <div className="p-4 sm:p-10 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4 sm:space-y-6">
           <div
-            className={`text-slate-800 font-sans ${fontClass} leading-relaxed sm:leading-loose text-justify break-words`}
+            dir={isArabic ? "rtl" : "ltr"}
+            className={`text-slate-800 ${
+              isArabic
+                ? "font-arabic text-right"
+                : "font-sans leading-relaxed sm:leading-loose text-justify"
+            } ${fontClass} break-words`}
           >
             {filteredAyahs.map((ayah) => {
               const isThisMarked =
@@ -741,9 +808,11 @@ export const SurahReader: React.FC<SurahReaderProps> = ({
                 >
                   <span>{ayah.text} </span>
                   <span
-                    className={`inline-grid place-items-center min-w-[22px] h-[22px] sm:min-w-[24px] sm:h-[24px] px-1 sm:px-1.5 rounded-full text-[11px] sm:text-[12px] font-bold leading-none font-['Hind_Siliguri',sans-serif] mx-0.5 sm:mx-1 align-middle transition-all shrink-0 bg-emerald-100 text-emerald-900 ${isThisMarked ? "ring-2 ring-emerald-600" : ""}`}
+                    className={`inline-grid place-items-center min-w-[24px] h-[24px] sm:min-w-[26px] sm:h-[26px] px-1.5 rounded-full text-[11px] sm:text-[13px] font-bold leading-none font-['Hind_Siliguri',sans-serif] mx-1 align-middle transition-all shrink-0 bg-emerald-100 text-emerald-900 ${isThisMarked ? "ring-2 ring-emerald-600" : ""}`}
                   >
-                    {toBengaliNumber(ayah.numberInSurah)}
+                    {isArabic
+                      ? toArabicNumber(ayah.numberInSurah)
+                      : toBengaliNumber(ayah.numberInSurah)}
                   </span>{" "}
                 </span>
               );

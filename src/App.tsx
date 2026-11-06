@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { QuranService } from "./services/quranService";
 import { TimerService } from "./services/timerService";
-import type { SurahMeta, LastRead } from "./types/quran";
+import type { SurahMeta, LastRead, QuranLanguage } from "./types/quran";
 import type { DailyReadingStats } from "./services/timerService";
 import { Navbar } from "./components/Navbar";
 import { SurahList } from "./components/SurahList";
@@ -10,14 +10,19 @@ import { DailyGoalModal } from "./components/DailyGoalModal";
 import { CheckCircle2 } from "lucide-react";
 
 function App() {
+  const [language, setLanguage] = useState<QuranLanguage>(() =>
+    QuranService.getLanguage(),
+  );
   const [surahs, setSurahs] = useState<SurahMeta[]>([]);
   const [selectedSurahId, setSelectedSurahId] = useState<number | null>(null);
   const [targetAyah, setTargetAyah] = useState<number | undefined>(undefined);
-  const [lastRead, setLastRead] = useState<LastRead | null>(null);
+  const [lastRead, setLastRead] = useState<LastRead | null>(() =>
+    QuranService.getLastRead(QuranService.getLanguage()),
+  );
 
-  // Daily Timer & Goal State (Pure Local Storage)
+  // Daily Timer & Goal State (Pure Local Storage, separated by language)
   const [timerStats, setTimerStats] = useState<DailyReadingStats>(() =>
-    TimerService.getStats(),
+    TimerService.getStats(QuranService.getLanguage()),
   );
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(true);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState<boolean>(false);
@@ -25,6 +30,11 @@ function App() {
     useState<boolean>(false);
 
   const unsavedSecondsRef = useRef<number>(0);
+  const languageRef = useRef<QuranLanguage>(language);
+
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
 
   // PWA Install Prompt State
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -67,10 +77,11 @@ function App() {
 
   // Initialize Local Data & Listen for Tab Visibility & Midnight Rollover
   useEffect(() => {
+    const currentLang = languageRef.current;
     const list = QuranService.getAllSurahs();
     setSurahs(list);
-    setLastRead(QuranService.getLastRead());
-    setTimerStats(TimerService.getStats());
+    setLastRead(QuranService.getLastRead(currentLang));
+    setTimerStats(TimerService.getStats(currentLang));
 
     // Clean up any legacy sync keys from localStorage
     try {
@@ -84,7 +95,7 @@ function App() {
     // Refresh stats & check day rollover when returning to tab
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        const currentStats = TimerService.getStats();
+        const currentStats = TimerService.getStats(languageRef.current);
         setTimerStats(currentStats);
       }
     };
@@ -95,7 +106,7 @@ function App() {
       setTimerStats((prev) => {
         if (prev.date !== todayStr) {
           unsavedSecondsRef.current = 0;
-          return TimerService.getStats();
+          return TimerService.getStats(languageRef.current);
         }
         return prev;
       });
@@ -108,9 +119,11 @@ function App() {
     };
   }, []);
 
-  // Timer Tick while reading a Surah
+  // Timer Tick while reading a Surah (isolated per language)
   useEffect(() => {
     if (!selectedSurahId || !isTimerRunning) return;
+
+    const activeLang = language;
 
     const interval = setInterval(() => {
       // Pause if tab is inactive/hidden
@@ -122,7 +135,7 @@ function App() {
         // Midnight rollover check during active reading
         if (prev.date !== todayStr) {
           unsavedSecondsRef.current = 0;
-          return TimerService.getStats();
+          return TimerService.getStats(activeLang);
         }
 
         unsavedSecondsRef.current += 1;
@@ -145,7 +158,7 @@ function App() {
 
       // Persist to local storage every 5 seconds
       if (unsavedSecondsRef.current >= 5) {
-        TimerService.addSeconds(unsavedSecondsRef.current);
+        TimerService.addSeconds(unsavedSecondsRef.current, activeLang);
         unsavedSecondsRef.current = 0;
       }
     }, 1000);
@@ -153,11 +166,26 @@ function App() {
     return () => {
       clearInterval(interval);
       if (unsavedSecondsRef.current > 0) {
-        TimerService.addSeconds(unsavedSecondsRef.current);
+        TimerService.addSeconds(unsavedSecondsRef.current, activeLang);
         unsavedSecondsRef.current = 0;
       }
     };
-  }, [selectedSurahId, isTimerRunning]);
+  }, [selectedSurahId, isTimerRunning, language]);
+
+  const handleChangeLanguage = (newLang: QuranLanguage) => {
+    if (newLang === language) return;
+
+    // Flush any unsaved seconds for the current language before switching
+    if (unsavedSecondsRef.current > 0) {
+      TimerService.addSeconds(unsavedSecondsRef.current, language);
+      unsavedSecondsRef.current = 0;
+    }
+
+    QuranService.setLanguage(newLang);
+    setLanguage(newLang);
+    setLastRead(QuranService.getLastRead(newLang));
+    setTimerStats(TimerService.getStats(newLang));
+  };
 
   const handleSelectSurah = (id: number, ayah?: number) => {
     setSelectedSurahId(id);
@@ -170,11 +198,11 @@ function App() {
     setSelectedSurahId(null);
     setTargetAyah(undefined);
     if (unsavedSecondsRef.current > 0) {
-      TimerService.addSeconds(unsavedSecondsRef.current);
+      TimerService.addSeconds(unsavedSecondsRef.current, language);
       unsavedSecondsRef.current = 0;
     }
-    setLastRead(QuranService.getLastRead());
-    setTimerStats(TimerService.getStats());
+    setLastRead(QuranService.getLastRead(language));
+    setTimerStats(TimerService.getStats(language));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -193,24 +221,26 @@ function App() {
           <div>
             <h4 className="font-bold text-sm">মাশাআল্লাহ! অভিনন্দন!</h4>
             <p className="text-xs text-emerald-100">
-              আপনার আজকের {timerStats.targetMinutes} মিনিটের পড়ার লক্ষ্য পূরণ
-              হয়েছে!
+              আপনার আজকের ({language === "ar" ? "আরবি" : "বাংলা"}){" "}
+              {timerStats.targetMinutes} মিনিটের পড়ার লক্ষ্য পূরণ হয়েছে!
             </p>
           </div>
         </div>
       )}
 
-      {/* Navbar with Daily Goal Widget */}
+      {/* Navbar with Language Switcher & Daily Goal Widget */}
       <Navbar
         currentSurahId={selectedSurahId}
         onBackToList={handleBackToList}
+        language={language}
+        onChangeLanguage={handleChangeLanguage}
         timerStats={timerStats}
         isTimerRunning={isTimerRunning}
         onToggleTimer={() => {
           setIsTimerRunning((r) => {
             const next = !r;
             if (!next && unsavedSecondsRef.current > 0) {
-              TimerService.addSeconds(unsavedSecondsRef.current);
+              TimerService.addSeconds(unsavedSecondsRef.current, language);
               unsavedSecondsRef.current = 0;
             }
             return next;
@@ -255,6 +285,7 @@ function App() {
           <SurahReader
             surahId={selectedSurahId}
             surahMeta={currentSurahMeta}
+            language={language}
             targetAyah={targetAyah}
             onSelectSurah={(id) => handleSelectSurah(id)}
             onBackToList={handleBackToList}
@@ -265,6 +296,8 @@ function App() {
         ) : (
           <SurahList
             surahs={surahs}
+            language={language}
+            onChangeLanguage={handleChangeLanguage}
             onSelectSurah={handleSelectSurah}
             lastRead={lastRead}
             timerStats={timerStats}
@@ -277,6 +310,7 @@ function App() {
       <DailyGoalModal
         isOpen={isGoalModalOpen}
         onClose={() => setIsGoalModalOpen(false)}
+        language={language}
         stats={timerStats}
         onStatsUpdated={(newStats, wasReset) => {
           if (wasReset) {
@@ -289,7 +323,7 @@ function App() {
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-500 space-y-2">
         <p className="font-medium text-slate-700">
-          আল-কুরআন — সহজ ও বিশুদ্ধ বাংলা অনুবাদ
+          আল-কুরআন — সহজ ও বিশুদ্ধ বাংলা অনুবাদ এবং ইন্দো-পাক আরবি তিলাওয়াত
         </p>
         <p className="text-slate-400">
           প্রতিদিন অন্তত ২০ মিনিট পাঠের লক্ষ্য • অফলাইন ও দ্রুতগতির সুবিধা

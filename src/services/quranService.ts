@@ -1,23 +1,53 @@
 import { SURAHS_LIST } from "../data/surahList";
-import type { SurahMeta, SurahDetail, LastRead } from "../types/quran";
+import type {
+  SurahMeta,
+  SurahDetail,
+  LastRead,
+  QuranLanguage,
+} from "../types/quran";
 
-let cachedQuranData: { [key: number]: SurahDetail } | null = null;
-let fetchPromise: Promise<{ [key: number]: SurahDetail }> | null = null;
+const cachedQuranData: Record<
+  QuranLanguage,
+  { [key: number]: SurahDetail } | null
+> = {
+  bn: null,
+  ar: null,
+};
 
-async function loadAllQuranData(): Promise<{ [key: number]: SurahDetail }> {
-  if (cachedQuranData) {
-    return cachedQuranData;
+const fetchPromises: Record<
+  QuranLanguage,
+  Promise<{ [key: number]: SurahDetail }> | null
+> = {
+  bn: null,
+  ar: null,
+};
+
+function getLastReadStorageKey(lang: QuranLanguage): string {
+  return lang === "ar" ? "quran_ar_last_read" : "quran_bn_last_read";
+}
+
+const LANGUAGE_STORAGE_KEY = "quran_selected_lang";
+
+async function loadAllQuranData(
+  lang: QuranLanguage = "bn",
+): Promise<{ [key: number]: SurahDetail }> {
+  if (cachedQuranData[lang]) {
+    return cachedQuranData[lang]!;
   }
 
-  if (fetchPromise) {
-    return fetchPromise;
+  if (fetchPromises[lang]) {
+    return fetchPromises[lang]!;
   }
 
-  fetchPromise = (async () => {
+  const dataUrl = lang === "ar" ? "/data/quran_ar.json" : "/data/quran_bn.json";
+
+  fetchPromises[lang] = (async () => {
     try {
-      const response = await fetch("/data/quran_bn.json");
+      const response = await fetch(dataUrl);
       if (!response.ok) {
-        throw new Error(`Failed to load Quran data: ${response.statusText}`);
+        throw new Error(
+          `Failed to load Quran (${lang}) data: ${response.statusText}`,
+        );
       }
       const json = await response.json();
       const map: { [key: number]: SurahDetail } = {};
@@ -27,16 +57,16 @@ async function loadAllQuranData(): Promise<{ [key: number]: SurahDetail }> {
         map[s.number] = s;
       }
 
-      cachedQuranData = map;
+      cachedQuranData[lang] = map;
       return map;
     } catch (error) {
-      console.error("Error loading Quran data:", error);
-      fetchPromise = null;
+      console.error(`Error loading Quran (${lang}) data:`, error);
+      fetchPromises[lang] = null;
       throw error;
     }
   })();
 
-  return fetchPromise;
+  return fetchPromises[lang]!;
 }
 
 export const QuranService = {
@@ -48,24 +78,48 @@ export const QuranService = {
     return SURAHS_LIST.find((s) => s.id === id);
   },
 
-  async getSurahDetail(surahNumber: number): Promise<SurahDetail | null> {
-    const data = await loadAllQuranData();
+  async getSurahDetail(
+    surahNumber: number,
+    lang: QuranLanguage = "bn",
+  ): Promise<SurahDetail | null> {
+    const data = await loadAllQuranData(lang);
     return data[surahNumber] || null;
   },
 
-  // Local Storage: Last Read
-  getLastRead(): LastRead | null {
+  // Language Preference (bn | ar)
+  getLanguage(): QuranLanguage {
     try {
-      const raw = localStorage.getItem("quran_bn_last_read");
+      const raw = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      return raw === "ar" ? "ar" : "bn";
+    } catch {
+      return "bn";
+    }
+  },
+
+  setLanguage(lang: QuranLanguage): void {
+    try {
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    } catch (e) {
+      console.error("Failed to save language preference", e);
+    }
+  },
+
+  // Local Storage: Last Read (Separate per language)
+  getLastRead(lang: QuranLanguage = "bn"): LastRead | null {
+    try {
+      const raw = localStorage.getItem(getLastReadStorageKey(lang));
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
   },
 
-  setLastRead(lastRead: LastRead): void {
+  setLastRead(lastRead: LastRead, lang: QuranLanguage = "bn"): void {
     try {
-      localStorage.setItem("quran_bn_last_read", JSON.stringify(lastRead));
+      localStorage.setItem(
+        getLastReadStorageKey(lang),
+        JSON.stringify(lastRead),
+      );
     } catch (e) {
       console.error("Failed to save last read", e);
     }

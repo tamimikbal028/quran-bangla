@@ -1,3 +1,5 @@
+import type { QuranLanguage } from "../types/quran";
+
 export interface DailyReadingStats {
   date: string; // YYYY-MM-DD
   targetMinutes: number; // 20 minutes default
@@ -8,7 +10,9 @@ export interface DailyReadingStats {
   updatedAt?: number;
 }
 
-const STORAGE_KEY = "quran_bn_timer_stats";
+function getStorageKey(lang: QuranLanguage = "bn"): string {
+  return lang === "ar" ? "quran_ar_timer_stats" : "quran_bn_timer_stats";
+}
 
 export function getTodayString(): string {
   const d = new Date();
@@ -31,7 +35,7 @@ export const TimerService = {
   getTodayString,
   getYesterdayString,
 
-  getStats(): DailyReadingStats {
+  getStats(lang: QuranLanguage = "bn"): DailyReadingStats {
     const today = getTodayString();
     const yesterday = getYesterdayString();
 
@@ -46,7 +50,7 @@ export const TimerService = {
     };
 
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(getStorageKey(lang));
       if (raw) {
         const parsed = JSON.parse(raw);
         stats = { ...stats, ...parsed };
@@ -69,7 +73,7 @@ export const TimerService = {
           stats.lastActiveDate = today;
           stats.updatedAt = Date.now();
 
-          this.saveStats(stats);
+          this.saveStats(stats, lang);
         }
       }
     } catch (e) {
@@ -79,43 +83,46 @@ export const TimerService = {
     return stats;
   },
 
-  saveStats(stats: DailyReadingStats): void {
+  saveStats(stats: DailyReadingStats, lang: QuranLanguage = "bn"): void {
     try {
       if (!stats.updatedAt) {
         stats.updatedAt = Date.now();
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+      localStorage.setItem(getStorageKey(lang), JSON.stringify(stats));
     } catch (e) {
       console.error("Failed to save timer stats", e);
     }
   },
 
-  addSeconds(seconds: number): DailyReadingStats {
-    const stats = this.getStats();
+  addSeconds(seconds: number, lang: QuranLanguage = "bn"): DailyReadingStats {
+    const stats = this.getStats(lang);
     stats.secondsToday += seconds;
     stats.totalAllTimeSeconds += seconds;
     stats.updatedAt = Date.now();
-    this.saveStats(stats);
+    this.saveStats(stats, lang);
     return stats;
   },
 
-  setTargetMinutes(minutes: number): DailyReadingStats {
-    const stats = this.getStats();
+  setTargetMinutes(
+    minutes: number,
+    lang: QuranLanguage = "bn",
+  ): DailyReadingStats {
+    const stats = this.getStats(lang);
     stats.targetMinutes = Math.max(1, minutes);
     stats.updatedAt = Date.now();
-    this.saveStats(stats);
+    this.saveStats(stats, lang);
     return stats;
   },
 
-  resetToday(): DailyReadingStats {
-    const stats = this.getStats();
+  resetToday(lang: QuranLanguage = "bn"): DailyReadingStats {
+    const stats = this.getStats(lang);
     stats.secondsToday = 0;
     stats.updatedAt = Date.now();
-    this.saveStats(stats);
+    this.saveStats(stats, lang);
     return stats;
   },
 
-  resetAll(): DailyReadingStats {
+  resetAll(lang: QuranLanguage = "bn"): DailyReadingStats {
     const today = getTodayString();
     const stats: DailyReadingStats = {
       date: today,
@@ -126,7 +133,7 @@ export const TimerService = {
       totalAllTimeSeconds: 0,
       updatedAt: Date.now(),
     };
-    this.saveStats(stats);
+    this.saveStats(stats, lang);
     return stats;
   },
 };

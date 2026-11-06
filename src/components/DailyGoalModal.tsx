@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { DailyReadingStats } from "../services/timerService";
+import type { QuranLanguage } from "../types/quran";
 import { TimerService } from "../services/timerService";
 import {
   toBengaliNumber,
@@ -20,6 +21,7 @@ import {
 interface DailyGoalModalProps {
   isOpen: boolean;
   onClose: () => void;
+  language: QuranLanguage;
   stats: DailyReadingStats;
   onStatsUpdated: (stats: DailyReadingStats, wasReset?: boolean) => void;
 }
@@ -27,11 +29,14 @@ interface DailyGoalModalProps {
 export const DailyGoalModal: React.FC<DailyGoalModalProps> = ({
   isOpen,
   onClose,
+  language,
   stats,
   onStatsUpdated,
 }) => {
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [showResetMenu, setShowResetMenu] = useState<boolean>(false);
+
+  const modeLabel = language === "ar" ? "আরবি কুরআন" : "বাংলা কুরআন";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -57,13 +62,15 @@ export const DailyGoalModal: React.FC<DailyGoalModalProps> = ({
   const isGoalReached = stats.secondsToday >= targetSeconds;
 
   const handleSetTarget = (minutes: number) => {
-    const updated = TimerService.setTargetMinutes(minutes);
+    const updated = TimerService.setTargetMinutes(minutes, language);
     onStatsUpdated(updated, false);
   };
 
   const handleResetToday = () => {
-    if (window.confirm("আপনি কি আজকের পঠিত সময় ০ করতে চান?")) {
-      const updated = TimerService.resetToday();
+    if (
+      window.confirm(`আপনি কি আজকের (${modeLabel}) পঠিত সময় ০ করতে চান?`)
+    ) {
+      const updated = TimerService.resetToday(language);
       onStatsUpdated(updated, true);
       setShowResetMenu(false);
       setFeedbackMsg("আজকের পড়ার সময় সফলভাবে ০:০০ করা হয়েছে।");
@@ -74,10 +81,10 @@ export const DailyGoalModal: React.FC<DailyGoalModalProps> = ({
   const handleResetAll = () => {
     if (
       window.confirm(
-        "সতর্কতা: আপনি কি সর্বমোট পঠিত সময়, স্ট্রিক সহ সকল রিডিং পরিসংখ্যান রিসেট করতে চান?",
+        `সতর্কতা: আপনি কি ${modeLabel}-এর সর্বমোট পঠিত সময়, স্ট্রিক সহ সকল রিডিং পরিসংখ্যান রিসেট করতে চান?`,
       )
     ) {
-      const updated = TimerService.resetAll();
+      const updated = TimerService.resetAll(language);
       onStatsUpdated(updated, true);
       setShowResetMenu(false);
       setFeedbackMsg("সকল রিডিং পরিসংখ্যান সম্পূর্ণ রিসেট করা হয়েছে।");
@@ -101,11 +108,18 @@ export const DailyGoalModal: React.FC<DailyGoalModalProps> = ({
               <Clock className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">
-                দৈনিক পড়ার সময় ও লক্ষ্য
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900">
+                  দৈনিক পড়ার সময় ও লক্ষ্য
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  {modeLabel}
+                </span>
+              </div>
               <p className="text-[11px] sm:text-xs text-slate-500">
-                প্রতিদিন নিয়মিত কুরআন ভাবার্থ পড়ার ট্র্যাকার
+                {language === "ar"
+                  ? "প্রতিদিন নিয়মিত আরবি কুরআন তিলাওয়াত ট্র্যাকার"
+                  : "প্রতিদিন নিয়মিত কুরআন ভাবার্থ পড়ার ট্র্যাকার"}
               </p>
             </div>
           </div>

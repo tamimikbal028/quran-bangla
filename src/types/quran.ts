@@ -33,5 +33,6 @@ export interface LastRead {
   updatedAt: number;
 }
 
+export type QuranLanguage = 'bn' | 'ar';
 export type ReadingMode = 'cards' | 'ruku' | 'continuous';
 export type FontSize = 'sm' | 'base' | 'lg' | 'xl' | '2xl';

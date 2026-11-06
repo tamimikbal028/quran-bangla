@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import type { SurahMeta, LastRead } from "../types/quran";
+import type { SurahMeta, LastRead, QuranLanguage } from "../types/quran";
 import type { DailyReadingStats } from "../services/timerService";
 import {
   toBengaliNumber,
@@ -18,6 +18,8 @@ import {
 
 interface SurahListProps {
   surahs: SurahMeta[];
+  language: QuranLanguage;
+  onChangeLanguage: (lang: QuranLanguage) => void;
   onSelectSurah: (id: number, targetAyah?: number) => void;
   lastRead: LastRead | null;
   timerStats: DailyReadingStats;
@@ -26,6 +28,8 @@ interface SurahListProps {
 
 export const SurahList: React.FC<SurahListProps> = ({
   surahs,
+  language,
+  onChangeLanguage,
   onSelectSurah,
   lastRead,
   timerStats,
@@ -56,12 +60,19 @@ export const SurahList: React.FC<SurahListProps> = ({
       const matchesId =
         surah.id.toString() === query || toBengaliNumber(surah.id) === query;
       const matchesBangla = surah.banglaName.toLowerCase().includes(query);
+      const matchesArabic = surah.name.includes(query);
       const matchesTranslit = surah.transliteration
         .toLowerCase()
         .includes(query);
       const matchesMeaning = surah.translation.toLowerCase().includes(query);
 
-      return matchesId || matchesBangla || matchesTranslit || matchesMeaning;
+      return (
+        matchesId ||
+        matchesBangla ||
+        matchesArabic ||
+        matchesTranslit ||
+        matchesMeaning
+      );
     });
   }, [surahs, activeTab, searchTerm]);
 
@@ -70,17 +81,48 @@ export const SurahList: React.FC<SurahListProps> = ({
       {/* Hero Banner */}
       <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white p-5 sm:p-9 shadow-lg shadow-emerald-900/10">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="relative z-10 max-w-2xl space-y-3">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/15 text-emerald-100 border border-white/20">
-            <Clock className="w-3.5 h-3.5" />
-            প্রতিদিনের লক্ষ্য: {toBengaliNumber(timerStats.targetMinutes)} মিনিট
+        <div className="relative z-10 max-w-2xl space-y-3.5">
+          {/* Top Badges & Mode Switcher */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center p-1 rounded-full bg-black/20 border border-white/15 backdrop-blur-xs">
+              <button
+                onClick={() => onChangeLanguage("bn")}
+                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  language === "bn"
+                    ? "bg-white text-emerald-900 shadow-xs"
+                    : "text-emerald-100 hover:text-white"
+                }`}
+              >
+                বাংলা কুরআন
+              </button>
+              <button
+                onClick={() => onChangeLanguage("ar")}
+                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  language === "ar"
+                    ? "bg-white text-emerald-900 shadow-xs"
+                    : "text-emerald-100 hover:text-white"
+                }`}
+              >
+                আরবি কুরআন (ইন্দো-পাক)
+              </button>
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/15 text-emerald-100 border border-white/20">
+              <Clock className="w-3.5 h-3.5" />
+              প্রতিদিনের লক্ষ্য: {toBengaliNumber(timerStats.targetMinutes)}{" "}
+              মিনিট
+            </div>
           </div>
+
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white leading-snug">
-            পবিত্র কুরআনের বিশুদ্ধ বাংলা ভাবার্থ
+            {language === "ar"
+              ? "পবিত্র কুরআনুল কারীম — মূল আরবি তিলাওয়াত"
+              : "পবিত্র কুরআনের বিশুদ্ধ বাংলা ভাবার্থ"}
           </h1>
           <p className="text-emerald-100/90 text-sm sm:text-base leading-relaxed">
-            সহজ বাংলা ভাষায় প্রতিদিন অন্তত ২০ মিনিট কুরআনের ভাবার্থ পাঠ ও
-            অনুধাবনের প্ল্যাটফর্ম।
+            {language === "ar"
+              ? "স্পষ্ট ইন্দো-পাক নূরানী ফন্টে প্রতিদিন অন্তত ২০ মিনিট পবিত্র কুরআন তিলাওয়াত, রুকুভিত্তিক পাঠ ও সময় ট্র্যাকিং প্ল্যাটফর্ম।"
+              : "সহজ বাংলা ভাষায় প্রতিদিন অন্তত ২০ মিনিট কুরআনের ভাবার্থ পাঠ ও অনুধাবনের প্ল্যাটফর্ম।"}
           </p>
         </div>
       </div>
@@ -93,7 +135,9 @@ export const SurahList: React.FC<SurahListProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider inline-flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-emerald-700" />
-                আজকের পড়ার লক্ষ্য
+                {language === "ar"
+                  ? "আজকের তিলাওয়াত লক্ষ্য (আরবি)"
+                  : "আজকের পড়ার লক্ষ্য (বাংলা)"}
               </span>
               <button
                 onClick={onOpenGoalModal}
@@ -161,14 +205,17 @@ export const SurahList: React.FC<SurahListProps> = ({
             <div className="flex items-start gap-3.5">
               <div className="min-w-0">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                  সর্বশেষ যেখান থেকে পড়া হয়েছিল
+                  {language === "ar"
+                    ? "সর্বশেষ যেখান থেকে তিলাওয়াত হয়েছিল (আরবি)"
+                    : "সর্বশেষ যেখান থেকে পড়া হয়েছিল (বাংলা)"}
                 </span>
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate mt-0.5">
                   {lastRead.surahName} • আয়াত{" "}
                   {toBengaliNumber(lastRead.ayahNumber)}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  ক্লিক করলেই সেখানে গিয়ে টাইমারসহ পড়া চালু হবে
+                  ক্লিক করলেই সেখানে গিয়ে টাইমারসহ{" "}
+                  {language === "ar" ? "তিলাওয়াত" : "পড়া"} চালু হবে
                 </p>
               </div>
             </div>
@@ -180,7 +227,11 @@ export const SurahList: React.FC<SurahListProps> = ({
                 }
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs sm:text-sm transition-all shadow-xs cursor-pointer active:scale-95"
               >
-                <span>পড়া চালিয়ে যান</span>
+                <span>
+                  {language === "ar"
+                    ? "তিলাওয়াত চালিয়ে যান"
+                    : "পড়া চালিয়ে যান"}
+                </span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -193,13 +244,16 @@ export const SurahList: React.FC<SurahListProps> = ({
               </div>
               <div>
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                  পড়া শুরু করুন
+                  {language === "ar"
+                    ? "তিলাওয়াত শুরু করুন (আরবি)"
+                    : "পড়া শুরু করুন (বাংলা)"}
                 </span>
                 <h3 className="text-base font-bold text-slate-900 mt-0.5">
                   সূরা ১. আল-ফাতিহা
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  প্রথম সূরা দিয়ে আপনার আজকের পাঠ শুরু করুন
+                  প্রথম সূরা দিয়ে আপনার আজকের{" "}
+                  {language === "ar" ? "তিলাওয়াত" : "পাঠ"} শুরু করুন
                 </p>
               </div>
             </div>
@@ -307,9 +361,19 @@ export const SurahList: React.FC<SurahListProps> = ({
 
                 {/* Names & Meaning */}
                 <div className="min-w-0">
-                  <h4 className="font-bold text-base text-slate-900 group-hover:text-emerald-800 truncate transition-colors leading-snug">
-                    {surah.banglaName}
-                  </h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-base text-slate-900 group-hover:text-emerald-800 truncate transition-colors leading-snug">
+                      {surah.banglaName}
+                    </h4>
+                    {language === "ar" && (
+                      <span
+                        dir="rtl"
+                        className="font-arabic text-lg text-emerald-800 font-normal leading-none shrink-0"
+                      >
+                        {surah.name}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500 truncate mt-0.5">
                     {surah.translation}
                   </p>

@@ -1,13 +1,15 @@
-// Service Worker for আল-কুরআন (বাংলা অনুবাদ)
-// Version 1.0.0
-const CACHE_NAME = 'quran-bn-cache-v1';
+// Service Worker for আল-কুরআন (আরবি ও বাংলা অনুবাদ)
+// Version 2.0.0
+const CACHE_NAME = 'quran-bn-ar-cache-v2';
 
 const STATIC_PRECACHE = [
   '/',
   '/index.html',
   '/data/quran_bn.json',
+  '/data/quran_ar.json',
   '/data/surah_index.json',
   '/fonts/Kalpurush.woff2',
+  '/fonts/IndoPak.woff2',
   '/app-icon.svg',
   '/favicon.svg',
   '/manifest.webmanifest'

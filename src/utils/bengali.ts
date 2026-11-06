@@ -1,10 +1,18 @@
 const BN_DIGITS = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
+const AR_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
 
 export function toBengaliNumber(
   num: number | string | undefined | null,
 ): string {
   if (num === undefined || num === null) return "";
   return num.toString().replace(/\d/g, (d) => BN_DIGITS[parseInt(d, 10)] ?? d);
+}
+
+export function toArabicNumber(
+  num: number | string | undefined | null,
+): string {
+  if (num === undefined || num === null) return "";
+  return num.toString().replace(/\d/g, (d) => AR_DIGITS[parseInt(d, 10)] ?? d);
 }
 
 export function getRevelationTypeBengali(type: string): string {

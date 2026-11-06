@@ -10,10 +10,24 @@
     url("/fonts/Kalpurush.ttf") format("truetype");
 }
 
+@font-face {
+  font-family: "IndoPak";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/IndoPak.woff2") format("woff2");
+}
+
 @theme {
   --font-sans: "Kalpurush", "Hind Siliguri", "Inter", system-ui, -apple-system, sans-serif;
   --font-heading: "Kalpurush", "Hind Siliguri", "Inter", system-ui, -apple-system, sans-serif;
   --font-kalpurush: "Kalpurush", sans-serif;
+  --font-arabic: "IndoPak", "Scheherazade New", "Amiri", "Traditional Arabic", serif;
+}
+
+.font-arabic {
+  font-family: "IndoPak", "Scheherazade New", "Amiri", "Traditional Arabic", serif !important;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
 }
 
 :root {
