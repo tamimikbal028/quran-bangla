@@ -79,7 +79,7 @@ export const SurahList: React.FC<SurahListProps> = ({
   return (
     <div className="max-w-5xl mx-auto px-3.5 sm:px-6 py-4 sm:py-8 space-y-5 sm:space-y-8">
       {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white p-5 sm:p-9 shadow-lg shadow-emerald-900/10">
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-linear-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white p-5 sm:p-9 shadow-lg shadow-emerald-900/10">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 max-w-2xl space-y-3.5">
           {/* Top Badges & Mode Switcher */}
@@ -103,13 +103,15 @@ export const SurahList: React.FC<SurahListProps> = ({
                     : "text-emerald-100 hover:text-white"
                 }`}
               >
-                আরবি কুরআন (ইন্দো-পাক)
+                আরবি কুরআন
               </button>
             </div>
 
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/15 text-emerald-100 border border-white/20">
               <Clock className="w-3.5 h-3.5" />
-              প্রতিদিনের লক্ষ্য: {toBengaliNumber(timerStats.targetMinutes)}{" "}
+              প্রতিদিনের লক্ষ্য: {toBengaliNumber(
+                timerStats.targetMinutes,
+              )}{" "}
               মিনিট
             </div>
           </div>
@@ -172,7 +174,7 @@ export const SurahList: React.FC<SurahListProps> = ({
             {/* Progress Bar */}
             <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden p-0.5 mt-2">
               <div
-                className="h-full bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full transition-all duration-500"
+                className="h-full bg-linear-to-r from-emerald-600 to-teal-600 rounded-full transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>

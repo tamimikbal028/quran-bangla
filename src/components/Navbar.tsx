@@ -53,7 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={onBackToList}
             className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group min-w-0"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center shadow-xs shadow-emerald-700/20 group-hover:scale-105 transition-transform shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-linear-to-br from-emerald-600 to-teal-700 flex items-center justify-center shadow-xs shadow-emerald-700/20 group-hover:scale-105 transition-transform shrink-0">
               <BookOpen className="w-4 h-4 text-white" />
             </div>
             <div className="min-w-0">
@@ -99,7 +99,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ? "bg-emerald-600 text-white shadow-2xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
-              title="আরবি কুরআন (ইন্দো-পাক) পড়ুন"
+              title="আরবি কুরআন পড়ুন"
             >
               আরবি
             </button>
